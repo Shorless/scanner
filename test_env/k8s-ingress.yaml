@@ -3,7 +3,7 @@ kind: Ingress
 metadata:
   name: api-gateway
   annotations:
-    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2"
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.3"
 spec:
   tls:
     - hosts:
