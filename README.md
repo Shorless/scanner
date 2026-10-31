@@ -1,6 +1,6 @@
 # ⚡ Shorless — Post-Quantum (PQC) DevSecOps Scanner & CycloneDX 1.6 CBOM Generator
 
-[![PyPI version](https://img.shields.io/badge/pypi-v0.8.6-10B981.svg)](https://pypi.org/project/shorless/)
+[![PyPI version](https://img.shields.io/badge/pypi-v0.8.7-10B981.svg)](https://pypi.org/project/shorless/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-06B6D4.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CycloneDX 1.6](https://img.shields.io/badge/CBOM-CycloneDX%201.6-A855F7.svg)](https://cyclonedx.org/capabilities/cbom/)
 
@@ -11,11 +11,11 @@
 
 ---
 
-## 🆕 Nouveautés de la version v0.8.6 (Support Dockerfile & Inspection TLS Live (--check-tls))
+## 🆕 Nouveautés de la version v0.8.7 (Support Multi-Fichiers IaC : Traefik, Kubernetes Ingress & Terraform)
 
-- Ajout du scan des Dockerfiles et détection OpenSSL < 3.2
-- Ajout de l'option --check-tls pour auditer un serveur TLS en direct
-- Export unifié Code + Infra + Réseau dans le CBOM CycloneDX 1.6
+- Ajout du scan des configurations Traefik (minVersion TLS 1.3 & curvePreferences X25519MLKEM768)
+- Inspection des manifestes Kubernetes Ingress & Cert-Manager (.yaml/.yml)
+- Analyse des fichiers Terraform (.tf) pour détecter les clés RSA/ECDSA et politiques Cloud TLS < 1.3
 
 ---
 

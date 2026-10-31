@@ -1,0 +1,11 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-gateway
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2"
+spec:
+  tls:
+    - hosts:
+        - api.entreprise.fr
+      secretName: api-tls-secret

@@ -291,6 +291,133 @@ def scan_live_tls_endpoint(target_url: str) -> list:
 
     return findings
 
+def scan_yaml_iac(filepath: Path) -> list:
+    """Scanne les fichiers YAML (Traefik & Kubernetes Ingress) pour vérifier TLS 1.3 et l'hybridation PQC."""
+    findings = []
+    content = filepath.read_text(encoding="utf-8", errors="ignore")
+    lines = content.splitlines()
+    lower_content = content.lower()
+
+    # 1. Détection Kubernetes Ingress & Cert-Manager
+    is_k8s_ingress = ("kind: ingress" in lower_content) or ("networking.k8s.io" in lower_content)
+    is_cert_manager = ("kind: certificate" in lower_content) and ("cert-manager.io" in lower_content)
+
+    if is_k8s_ingress and "tls:" in lower_content:
+        has_pqc_curve = any(k in lower_content for k in ("mlkem", "kyber", "x25519mlkem768"))
+        for i, line in enumerate(lines, start=1):
+            clean = line.strip()
+            if clean.startswith("#"):
+                continue
+            if "ssl-protocols" in clean.lower() and "tlsv1.3" not in clean.lower():
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Infra (K8s Ingress)",
+                    "detected": clean,
+                    "algo": "Annotation Ingress TLS < 1.3",
+                    "risk": "CRITIQUE",
+                    "remediation": "Forcer 'nginx.ingress.kubernetes.io/ssl-protocols: \"TLSv1.3\"'."
+                })
+        if not has_pqc_curve:
+            findings.append({
+                "file": str(filepath),
+                "line": 1,
+                "type": "Infra (K8s Ingress)",
+                "detected": "Terminaison TLS Ingress sans courbe hybride PQC",
+                "algo": "K8s Ingress ECDHE Classique",
+                "risk": "MOYEN",
+                "remediation": "Ajouter l'annotation 'nginx.ingress.kubernetes.io/server-snippet: ssl_ecdh_curve X25519MLKEM768:X25519;'."
+            })
+
+    if is_cert_manager:
+        for i, line in enumerate(lines, start=1):
+            clean = line.strip()
+            if "algorithm:" in clean.lower() and any(a in clean.upper() for a in ("RSA", "ECDSA")):
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Infra (Cert-Manager K8s)",
+                    "detected": clean,
+                    "algo": "Clé privée X.509 Asymétrique Classique (RSA/ECDSA)",
+                    "risk": "MOYEN",
+                    "remediation": "Inventorié dans le CBOM. Préparer la migration PKI vers des certificats hybrides ou ML-DSA (FIPS 204)."
+                })
+
+    # 2. Détection Traefik (tls.options, curvePreferences, minVersion)
+    is_traefik = (" tls:" in lower_content or "\ntls:" in lower_content) and (
+        "options:" in lower_content or "curvepreferences" in lower_content or "minversion" in lower_content or "entrypoints" in lower_content
+    )
+    if is_traefik:
+        has_traefik_pqc = any(k in lower_content for k in ("mlkem", "kyber", "x25519mlkem768"))
+        for i, line in enumerate(lines, start=1):
+            clean = line.strip()
+            if clean.startswith("#"):
+                continue
+            if "minversion" in clean.lower() and " versiontls13" not in clean.lower() and "tlsv1.3" not in clean.lower() and "versiontls13" not in clean.lower():
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Infra (Traefik)",
+                    "detected": clean,
+                    "algo": "Traefik TLS minVersion < 1.3",
+                    "risk": "CRITIQUE",
+                    "remediation": "Définir 'minVersion: VersionTLS13' dans tls.options de Traefik."
+                })
+        if not has_traefik_pqc:
+            findings.append({
+                "file": str(filepath),
+                "line": 1,
+                "type": "Infra (Traefik)",
+                "detected": "Absence de courbe post-quantique dans curvePreferences",
+                "algo": "Traefik ECDHE Classique",
+                "risk": "MOYEN",
+                "remediation": "Configurer 'curvePreferences: [X25519MLKEM768, X25519]' dans tls.options (Traefik v3.1+)."
+            })
+
+    return findings
+
+
+def scan_terraform_file(filepath: Path) -> list:
+    """Scanne les fichiers Terraform (.tf) pour détecter les clés RSA/ECDSA et politiques TLS obsolètes."""
+    findings = []
+    content = filepath.read_text(encoding="utf-8", errors="ignore")
+    lines = content.splitlines()
+
+    for i, line in enumerate(lines, start=1):
+        clean = line.strip()
+        if not clean or clean.startswith("#") or clean.startswith("//"):
+            continue
+        low = clean.lower()
+
+        # 1. Ressource tls_private_key ou clés KMS asymétriques RSA / ECDSA
+        if "algorithm" in low and "=" in low and any(alg in clean.upper() for alg in ('"RSA"', '"ECDSA"', '"ED25519"')):
+            findings.append({
+                "file": str(filepath),
+                "line": i,
+                "type": "IaC (Terraform)",
+                "detected": clean,
+                "algo": "Génération de clé Terraform RSA / ECDSA (Vulnérable à Shor)",
+                "risk": "CRITIQUE",
+                "remediation": "Remplacer les clés statiques RSA/ECDSA par des mécanismes d'encapsulation hybrides (ML-KEM) ou signatures ML-DSA."
+            })
+
+        # 2. Politiques TLS AWS ALB / CloudFront / GCP / Azure < TLS 1.3
+        if ("ssl_policy" in low or "security_policy" in low or "minimum_protocol_version" in low) and (
+            any(old_tls in clean.upper() for old_tls in ("TLS-1-0", "TLS-1-1", "TLS-1-2", "TLS1_0", "TLS1_1", "TLS1_2", "2016", "2017", "2021"))
+            and "1-3" not in clean.upper()
+            and "1_3" not in clean.upper()
+        ):
+            findings.append({
+                "file": str(filepath),
+                "line": i,
+                "type": "IaC (Terraform)",
+                "detected": clean,
+                "algo": "Politique Cloud Load Balancer / CDN < TLS 1.3",
+                "risk": "CRITIQUE",
+                "remediation": "Mettre à niveau vers une politique TLS 1.3 supportant l'échange de clés post-quantique (ex: ELBSecurityPolicy-TLS13-1-2-2021-06 ou PQ-TLS)."
+            })
+
+    return findings
 
 def generate_cyclonedx_cbom(findings: list, output_path: str):
     """Génère un fichier CBOM (Cryptography Bill of Materials) au format standard CycloneDX 1.6."""
@@ -301,7 +428,7 @@ def generate_cyclonedx_cbom(findings: list, output_path: str):
         "version": 1,
         "metadata": {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.8.6"}]
+            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.8.7"}]
         },
         "components": []
     }
@@ -362,6 +489,15 @@ def scan(
                 or item.name.lower().endswith(".dockerfile")
             ):
                 all_findings.extend(scan_dockerfile(item))
+        # 3b. Scan des configurations YAML (Traefik & Kubernetes Ingress)
+        for yaml_file in list(path.rglob("*.yml")) + list(path.rglob("*.yaml")):
+            if ".github" in yaml_file.parts:
+                continue
+            all_findings.extend(scan_yaml_iac(yaml_file))
+
+        # 3c. Scan des fichiers Terraform (.tf)
+        for tf_file in path.rglob("*.tf"):
+            all_findings.extend(scan_terraform_file(tf_file))
 
     # 4. Scan TLS en direct si --check-tls est fourni
     if check_tls:

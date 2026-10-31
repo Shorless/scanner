@@ -1,15 +1,15 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:d493754b-49ff-4dc6-bf2c-3a0e3f7565d0",
+  "serialNumber": "urn:uuid:7ce8a823-3d76-4b8b-b1df-3a5bb096451c",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-31T09:41:53.983690+00:00",
+    "timestamp": "2026-10-31T10:24:34.698766+00:00",
     "tools": [
       {
         "vendor": "Shorless",
         "name": "shorless-scanner",
-        "version": "0.8.6"
+        "version": "0.8.7"
       }
     ]
   },
@@ -120,6 +120,78 @@
         "assetType": "algorithm",
         "quantumSafe": "false",
         "remediation": "Ne pas générer de clés asymétriques classiques dans le build Docker ; utiliser des certificats hybrides injectés au runtime."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-6",
+      "name": "Annotation Ingress TLS < 1.3",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\k8s-ingress.yaml",
+            "line": 6
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Forcer 'nginx.ingress.kubernetes.io/ssl-protocols: \"TLSv1.3\"'."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-7",
+      "name": "K8s Ingress ECDHE Classique",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\k8s-ingress.yaml",
+            "line": 1
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Ajouter l'annotation 'nginx.ingress.kubernetes.io/server-snippet: ssl_ecdh_curve X25519MLKEM768:X25519;'."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-8",
+      "name": "Génération de clé Terraform RSA / ECDSA (Vulnérable à Shor)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\main.tf",
+            "line": 2
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Remplacer les clés statiques RSA/ECDSA par des mécanismes d'encapsulation hybrides (ML-KEM) ou signatures ML-DSA."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-9",
+      "name": "Politique Cloud Load Balancer / CDN < TLS 1.3",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\main.tf",
+            "line": 9
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Mettre à niveau vers une politique TLS 1.3 supportant l'échange de clés post-quantique (ex: ELBSecurityPolicy-TLS13-1-2-2021-06 ou PQ-TLS)."
       }
     }
   ]

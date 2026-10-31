@@ -1,5 +1,10 @@
 # Changelog — Shorless PQC & CBOM Scanner
 
+## [v0.8.7] — 2026-10-31 : Support Multi-Fichiers IaC : Traefik, Kubernetes Ingress & Terraform
+- Ajout du scan des configurations Traefik (minVersion TLS 1.3 & curvePreferences X25519MLKEM768)
+- Inspection des manifestes Kubernetes Ingress & Cert-Manager (.yaml/.yml)
+- Analyse des fichiers Terraform (.tf) pour détecter les clés RSA/ECDSA et politiques Cloud TLS < 1.3
+
 ## [v0.8.6] — 2026-10-31 : Support Dockerfile & Inspection TLS Live (--check-tls)
 - Ajout du scan des Dockerfiles et détection OpenSSL < 3.2
 - Ajout de l'option --check-tls pour auditer un serveur TLS en direct
