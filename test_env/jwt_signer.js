@@ -1,3 +1,3 @@
 const crypto = require('crypto');
-const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-const hash = crypto.createHash('md5').update('token').digest('hex');
+const { privateKey } = crypto./* [SHORLESS-PQC] */ generateKeyPairSync('rsa', { modulusLength: 2048 });
+const hash = crypto.createHash('sha256').update('token').digest('hex');

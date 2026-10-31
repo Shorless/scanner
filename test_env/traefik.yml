@@ -1,6 +1,7 @@
 tls:
   options:
     default:
-      minVersion: VersionTLS12
+      minVersion: VersionTLS13
       curvePreferences:
-        - CurveP384
+        - X25519MLKEM768
+        - X25519
