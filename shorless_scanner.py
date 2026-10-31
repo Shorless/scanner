@@ -93,6 +93,100 @@ class PythonCryptoVisitor(ast.NodeVisitor):
             })
         self.generic_visit(node)
 
+def scan_multilang_source(filepath: Path) -> list:
+    """Scanne les fichiers source Java (.java), Go (.go) et Node.js/TypeScript (.js, .ts) pour détecter les primitives vulnérables."""
+    findings = []
+    suffix = filepath.suffix.lower()
+    content = filepath.read_text(encoding="utf-8", errors="ignore")
+    lines = content.splitlines()
+
+    for i, line in enumerate(lines, start=1):
+        clean = line.strip()
+        if not clean or clean.startswith("//") or clean.startswith("/*") or clean.startswith("*"):
+            continue
+
+        # 1. Règles Java (JCA / BouncyCastle)
+        if suffix == ".java":
+            if "KeyPairGenerator.getInstance" in clean and any(alg in clean.upper() for alg in ('"RSA"', '"EC"', '"ECDSA"', '"DSA"', '"DH"')):
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Code Java (JCA)",
+                    "detected": clean,
+                    "algo": "Java KeyPairGenerator RSA/ECC (Vulnérable à Shor)",
+                    "risk": "CRITIQUE",
+                    "remediation": "Utiliser BouncyCastle PQC (bcprov-jdk18on) avec ML-KEM (Kyber) ou ML-DSA (Dilithium)."
+                })
+            elif "Cipher.getInstance" in clean and "RSA" in clean.upper():
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Code Java (JCA)",
+                    "detected": clean,
+                    "algo": "Chiffrement RSA Java (Vulnérable à Shor)",
+                    "risk": "CRITIQUE",
+                    "remediation": "Remplacer le chiffrement asymétrique RSA par une encapsulation KEM hybride (ML-KEM-768 + AES-256-GCM)."
+                })
+            elif "MessageDigest.getInstance" in clean and any(h in clean.upper() for h in ('"SHA-1"', '"SHA1"', '"MD5"')):
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Code Java (JCA)",
+                    "detected": clean,
+                    "algo": "Hachage Java SHA-1 / MD5 Obsolète",
+                    "risk": "ÉLEVÉ",
+                    "remediation": "Migrer vers MessageDigest.getInstance(\"SHA-256\") ou \"SHA3-256\"."
+                })
+
+        # 2. Règles Go (crypto/rsa, crypto/ecdsa, crypto/sha1)
+        elif suffix == ".go":
+            if "rsa.GenerateKey" in clean or "ecdsa.GenerateKey" in clean or "elliptic.P256()" in clean or "elliptic.P384()" in clean:
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Code Go (Stdlib)",
+                    "detected": clean,
+                    "algo": "Go crypto/rsa ou crypto/ecdsa (Vulnérable à Shor)",
+                    "risk": "CRITIQUE",
+                    "remediation": "Migrer vers crypto/mlkem (Go 1.24+) ou cloudflare/circl pour l'encapsulation hybride X25519MLKEM768."
+                })
+            elif "sha1.New()" in clean or "md5.New()" in clean or "sha1.Sum(" in clean or "md5.Sum(" in clean:
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Code Go (Stdlib)",
+                    "detected": clean,
+                    "algo": "Hachage Go SHA-1 / MD5 Obsolète",
+                    "risk": "ÉLEVÉ",
+                    "remediation": "Remplacer par crypto/sha256 ou golang.org/x/crypto/sha3."
+                })
+
+        # 3. Règles Node.js / TypeScript (node:crypto / WebCrypto)
+        elif suffix in (".js", ".ts", ".mjs", ".cjs"):
+            if ("generateKeyPair" in clean or "generateKeyPairSync" in clean or "createSign" in clean) and any(
+                alg in clean.lower() for alg in ("'rsa'", '"rsa"', "'ec'", '"ec"', "'dsa'", '"dsa"', "secp256k1", "prime256v1", "p-256")
+            ):
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Code Node.js / TS",
+                    "detected": clean,
+                    "algo": "Node.js crypto RSA / ECDSA (Vulnérable à Shor)",
+                    "risk": "CRITIQUE",
+                    "remediation": "Migrer vers un binding liboqs / OpenSSL 3.2+ ou WebCrypto supportant ML-KEM (FIPS 203) et ML-DSA (FIPS 204)."
+                })
+            elif "createHash(" in clean and any(h in clean.lower() for h in ("'sha1'", '"sha1"', "'md5'", '"md5"')):
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Code Node.js / TS",
+                    "detected": clean,
+                    "algo": "Hachage Node.js SHA-1 / MD5 Obsolète",
+                    "risk": "ÉLEVÉ",
+                    "remediation": "Utiliser crypto.createHash('sha256') ou 'sha3-256'."
+                })
+
+    return findings
 
 def scan_nginx_config(filepath: Path) -> list:
     """Scanne les fichiers de configuration Nginx pour vérifier la présence de TLS hybride PQC."""
@@ -428,7 +522,7 @@ def generate_cyclonedx_cbom(findings: list, output_path: str):
         "version": 1,
         "metadata": {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.2"}]
+            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.3"}]
         },
         "components": []
     }
@@ -733,6 +827,12 @@ def scan(
                 all_findings.extend(visitor.findings)
             except SyntaxError:
                 pass
+        # 1b. Scan des fichiers Multi-Langages Backend (.java, .go, .js, .ts)
+        for ext in ("*.java", "*.go", "*.js", "*.ts"):
+            for src_file in path.rglob(ext):
+                if "node_modules" in src_file.parts or "vendor" in src_file.parts or "dist" in src_file.parts:
+                    continue
+                all_findings.extend(scan_multilang_source(src_file))
 
         # 2. Scan des configurations Nginx (.conf)
         for conf_file in path.rglob("*.conf"):

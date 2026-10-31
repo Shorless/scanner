@@ -1,7 +1,7 @@
 # ⚡ Shorless — Post-Quantum (PQC) DevSecOps Scanner & CycloneDX 1.6 CBOM Generator
 
-[![PyPI version](https://img.shields.io/badge/pypi-v0.9.2-10B981.svg)](https://pypi.org/project/shorless/)
-[![GitHub Release](https://img.shields.io/badge/release-v0.9.2-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v0.9.2)
+[![PyPI version](https://img.shields.io/badge/pypi-v0.9.3-10B981.svg)](https://pypi.org/project/shorless/)
+[![GitHub Release](https://img.shields.io/badge/release-v0.9.3-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v0.9.3)
 [![License](https://img.shields.io/badge/license-Apache%202.0-3B82F6.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CycloneDX 1.6](https://img.shields.io/badge/CBOM-CycloneDX%201.6-A855F7.svg)](https://cyclonedx.org/capabilities/cbom/)
 
@@ -12,11 +12,10 @@
 
 ---
 
-## 🆕 Nouveautés de la version v0.9.2 (Générateur de Rapport d'Audit Exécutif HTML/PDF (--report-html))
+## 🆕 Nouveautés de la version v0.9.3 (Support Multi-Langages Backend (Java, Go, Node.js / TypeScript))
 
-- Ajout de l'option --report-html générant un rapport exécutif HTML/PDF autonome avec Score de Maturité PQC (/100)
-- Synthèse de conformité réglementaire ANSSI, NIST FIPS 203/204, NIS 2 et DORA prête pour les RSSI et CTO
-- Mise à jour de la documentation CLI, de la GitHub Action et des tests automatisés
+- Ajout du scan Java, Go et Node.js/TS
+- Ajout des tests unitaires automatisés multi-langages
 
 ---
 
@@ -35,8 +34,8 @@ pip install -U shorless
 ## 💻 Référence complète des Commandes & Options CLI
 
 ```bash
-# 1. Audit complet Code (Python AST) + Multi-IaC (Nginx, Dockerfile, Traefik, K8s Ingress, Terraform)
-shorless ./mon_projet --cbom cbom.json
+# 1. Audit complet Code (Python AST) + Multi-IaC + Rapport Exécutif HTML/PDF
+shorless ./mon_projet --cbom cbom.json --report-html pqc-report.html
 
 # 2. Inspection en direct d'un endpoint TLS distant (TLS 1.3, KEM hybride X25519MLKEM768 & certificat X.509)
 shorless . --check-tls https://shorless.io --cbom cbom-live.json
@@ -55,6 +54,7 @@ shorless . --check-tls https://api.entreprise.fr --cbom cbom.json --ci
 | :--- | :--- | :--- | :--- |
 | `TARGET_DIR` | Argument | `.` | Chemin du dossier projet ou dépôt Git à analyser récursivement (`.py`, `.conf`, `Dockerfile*`, `.yml/.yaml`, `.tf`). |
 | `--cbom TEXT` | Option | `cbom.json` | Chemin du fichier JSON généré au standard officiel **OWASP CycloneDX 1.6**. |
+| `--report-html TEXT` | Option | `None` | Génère un **Rapport d'Audit Exécutif HTML/PDF** autonome (Score PQC /100, NIS 2, DORA, ANSSI) pour RSSI & CTO. |
 | `--check-tls TEXT` | Option | `None` | URL ou `domaine:port` à inspecter en direct (handshake TLS 1.3, groupe hybride `X25519MLKEM768`, certificat X.509). |
 | `--fix` | Flag | `False` | Corrige automatiquement les fichiers IaC (Nginx, Dockerfile, Traefik, K8s Ingress, Terraform) vers TLS 1.3 & ML-KEM. |
 | `--dry-run` | Flag | `False` | Simule l'option `--fix` et affiche les correctifs prévus dans le terminal sans modifier aucun fichier sur le disque. |
@@ -63,7 +63,7 @@ shorless . --check-tls https://api.entreprise.fr --cbom cbom.json --ci
 
 ---
 
-## 🤖 Intégration GitHub Action Officielle (`Shorless/scanner@v0.9.2`)
+## 🤖 Intégration GitHub Action Officielle (`Shorless/scanner@v0.9.3`)
 
 Ajoutez ce workflow dans `.github/workflows/shorless-pqc.yml` pour auditer chaque Pull Request et archiver automatiquement le CBOM CycloneDX 1.6 :
 
@@ -79,7 +79,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Shorless PQC & CBOM Scanner
-        uses: Shorless/scanner@v0.9.2
+        uses: Shorless/scanner@v0.9.3
         with:
           target-dir: "."
           output-cbom: "cbom-cyclonedx.json"
@@ -96,6 +96,7 @@ jobs:
 | :--- | :--- | :--- | :--- |
 | `target-dir` | Non | `"."` | Répertoire projet à analyser (`TARGET_DIR`). |
 | `output-cbom` | Non | `"cbom.json"` | Chemin du fichier CBOM CycloneDX 1.6 généré (`--cbom`). |
+| `report-html` | Non | `"pqc-report.html"` | Chemin du rapport d'audit exécutif HTML/PDF généré (`--report-html`). |
 | `check-tls` | Non | `""` | Endpoint TLS distant à auditer en direct (`--check-tls`). |
 | `auto-fix` | Non | `"false"` | Applique automatiquement les correctifs PQC sur les fichiers IaC (`--fix`). |
 | `dry-run` | Non | `"false"` | Prévisualise les patchs IaC dans les logs sans modifier les fichiers (`--dry-run`). |

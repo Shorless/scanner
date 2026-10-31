@@ -1,5 +1,9 @@
 # Changelog — Shorless PQC & CBOM Scanner
 
+## [v0.9.3] — 2026-10-31 : Support Multi-Langages Backend (Java, Go, Node.js / TypeScript)
+- Ajout du scan Java, Go et Node.js/TS
+- Ajout des tests unitaires automatisés multi-langages
+
 ## [v0.9.2] — 2026-10-31 : Générateur de Rapport d'Audit Exécutif HTML/PDF (--report-html)
 - Ajout de l'option --report-html générant un rapport exécutif HTML/PDF autonome avec Score de Maturité PQC (/100)
 - Synthèse de conformité réglementaire ANSSI, NIST FIPS 203/204, NIS 2 et DORA prête pour les RSSI et CTO
