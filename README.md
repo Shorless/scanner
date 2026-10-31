@@ -1,7 +1,7 @@
 # ⚡ Shorless — Post-Quantum (PQC) DevSecOps Scanner & CycloneDX 1.6 CBOM Generator
 
-[![PyPI version](https://img.shields.io/badge/pypi-v0.9.4-10B981.svg)](https://pypi.org/project/shorless/)
-[![GitHub Release](https://img.shields.io/badge/release-v0.9.4-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v0.9.4)
+[![PyPI version](https://img.shields.io/badge/pypi-v0.9.5-10B981.svg)](https://pypi.org/project/shorless/)
+[![GitHub Release](https://img.shields.io/badge/release-v0.9.5-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v0.9.5)
 [![License](https://img.shields.io/badge/license-Apache%202.0-3B82F6.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CycloneDX 1.6](https://img.shields.io/badge/CBOM-CycloneDX%201.6-A855F7.svg)](https://cyclonedx.org/capabilities/cbom/)
 
@@ -12,10 +12,12 @@
 
 ---
 
-## 🆕 Nouveautés de la version v0.9.4 (Support Multi-Langages Backend (C# .NET))
+## 🆕 Nouveautés de la version v0.9.5 (Authentification SaaS (--api-key) & Pull Requests Automatiques (--auto-pr))
 
-- Ajout du scan statique pour  C# .NET (.cs)
-- Validation unitaire automatisée sur 11 cibles (6 langages + 5 formats IaC) dans le CBOM CycloneDX 1.6 et le rapport exécutif HTML/PDF
+- Ajout de l'authentification SaaS (--api-key / SHORLESS_API_KEY) reliée à l'endpoint api_verify.php
+- Ajout de l'option --auto-pr pour créer une branche Git dédiée et ouvrir automatiquement les Pull Requests de remédiation PQC
+- Mise à jour de la GitHub Action officielle (action.yml) avec injection automatique de GITHUB_TOKEN
+- Ajout des auto-remdiations de code multi-language
 
 ---
 
@@ -63,7 +65,7 @@ shorless . --check-tls https://api.entreprise.fr --cbom cbom.json --ci
 
 ---
 
-## 🤖 Intégration GitHub Action Officielle (`Shorless/scanner@v0.9.4`)
+## 🤖 Intégration GitHub Action Officielle (`Shorless/scanner@v0.9.5`)
 
 Ajoutez ce workflow dans `.github/workflows/shorless-pqc.yml` pour auditer chaque Pull Request et archiver automatiquement le CBOM CycloneDX 1.6 :
 
@@ -79,7 +81,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Shorless PQC & CBOM Scanner
-        uses: Shorless/scanner@v0.9.4
+        uses: Shorless/scanner@v0.9.5
         with:
           target-dir: "."
           output-cbom: "cbom-cyclonedx.json"

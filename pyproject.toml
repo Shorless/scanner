@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shorless"
-version = "0.9.4"
+version = "0.9.5"
 description = "Scanner DevSecOps Post-Quantique (PQC) & Générateur CBOM CycloneDX 1.6"
 readme = "README.md"
 requires-python = ">=3.8"

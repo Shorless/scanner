@@ -1,7 +1,6 @@
 name: "Shorless PQC & CycloneDX 1.6 CBOM Scanner"
 author: "Shorless Security"
-description: "Audit Post-Quantique (AST Python, Nginx, Docker, Traefik, K8s, Terraform, TLS Live), CBOM CycloneDX 1.6 & Auto-Fix."
-
+description: "Audit Post-Quantique (Python, Java, Go, Node.js, TS, C#, Multi-IaC, TLS Live), Auto-PR SaaS & CBOM CycloneDX 1.6."
 branding:
   icon: "shield"
   color: "green"
@@ -12,64 +11,84 @@ inputs:
     required: false
     default: "."
   output-cbom:
-    description: "Chemin du fichier CBOM CycloneDX 1.6 généré"
+    description: "Chemin du fichier CBOM CycloneDX 1.6 généré (--cbom)"
     required: false
     default: "cbom.json"
   report-html:
-    description: "Chemin du rapport d'audit exécutif HTML/PDF (ex: pqc-report.html)"
+    description: "Chemin du rapport d'audit exécutif HTML/PDF généré (--report-html)"
     required: false
     default: "pqc-report.html"
   check-tls:
-    description: "URL ou domaine:port à inspecter en direct (ex: https://shorless.io)"
+    description: "URL ou domaine:port à inspecter en direct (--check-tls)"
     required: false
     default: ""
-  fail-on-critical:
-    description: "Bloquer la pipeline CI/CD (exit code 1) si un risque critique face à Shor est détecté ('true' ou 'false')"
-    required: false
-    default: "true"
   auto-fix:
-    description: "Corriger automatiquement les configurations IaC vulnérables (--fix)"
+    description: "Applique automatiquement les correctifs PQC sur les fichiers IaC (--fix)"
     required: false
     default: "false"
   dry-run:
-    description: "Simuler les correctifs --fix sans modifier les fichiers (--dry-run)"
+    description: "Simule les corrections --fix sans modifier les fichiers (--dry-run)"
     required: false
     default: "false"
-  upload-artifact:
-    description: "Téléverser automatiquement le fichier CBOM en tant qu'artefact de build GitHub Actions"
+  api-key:
+    description: "Clé d'API Shorless SaaS (--api-key) pour activer la télémétrie et l'ouverture automatique de Pull Requests"
+    required: false
+    default: ""
+  auto-pr:
+    description: "Crée une branche Git et ouvre automatiquement une Pull Request avec les correctifs IaC (--auto-pr)"
+    required: false
+    default: "false"
+  pr-base:
+    description: "Branche cible pour la Pull Request automatique (--pr-base)"
+    required: false
+    default: "main"
+  fail-on-critical:
+    description: "Bloque le pipeline CI/CD (exit code 1) si au moins un risque CRITIQUE est détecté (--ci)"
     required: false
     default: "true"
-
-outputs:
-  cbom-path:
-    description: "Chemin vers le fichier CBOM CycloneDX 1.6 généré"
-    value: ${{ inputs.output-cbom }}
+  upload-artifact:
+    description: "Téléverse automatiquement le CBOM JSON et le rapport HTML en artefacts GitHub Actions"
+    required: false
+    default: "true"
 
 runs:
   using: "composite"
   steps:
-    - name: Setup Python 3.11
+    - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
         python-version: "3.11"
 
-    - name: Install Shorless PQC Scanner from PyPI
+    - name: Install Shorless PQC Scanner
       shell: bash
       run: |
         python -m pip install --upgrade pip
-        pip install -U shorless
+        if [ -f "${{ github.action_path }}/pyproject.toml" ]; then
+          python -m pip install "${{ github.action_path }}"
+        else
+          python -m pip install --upgrade shorless
+        fi
 
     - name: Run Shorless PQC & CBOM Audit
       shell: bash
       env:
+        GITHUB_TOKEN: ${{ github.token }}
         INPUT_TARGET: ${{ inputs.target-dir }}
         INPUT_CBOM: ${{ inputs.output-cbom }}
+        INPUT_HTML: ${{ inputs.report-html }}
         INPUT_TLS: ${{ inputs.check-tls }}
-        INPUT_CI: ${{ inputs.fail-on-critical }}
         INPUT_FIX: ${{ inputs.auto-fix }}
         INPUT_DRY: ${{ inputs.dry-run }}
+        INPUT_API_KEY: ${{ inputs.api-key }}
+        INPUT_AUTO_PR: ${{ inputs.auto-pr }}
+        INPUT_PR_BASE: ${{ inputs.pr-base }}
+        INPUT_CI: ${{ inputs.fail-on-critical }}
       run: |
         ARGS=("$INPUT_TARGET" "--cbom" "$INPUT_CBOM")
+
+        if [ -n "$INPUT_HTML" ]; then
+          ARGS+=("--report-html" "$INPUT_HTML")
+        fi
         if [ -n "$INPUT_TLS" ]; then
           ARGS+=("--check-tls" "$INPUT_TLS")
         fi
@@ -79,21 +98,23 @@ runs:
         if [ "$INPUT_DRY" = "true" ]; then
           ARGS+=("--dry-run")
         fi
+        if [ -n "$INPUT_API_KEY" ]; then
+          ARGS+=("--api-key" "$INPUT_API_KEY")
+        fi
+        if [ "$INPUT_AUTO_PR" = "true" ]; then
+          ARGS+=("--auto-pr" "--pr-base" "$INPUT_PR_BASE")
+        fi
         if [ "$INPUT_CI" = "true" ]; then
           ARGS+=("--ci")
         fi
-        if [ -n "$INPUT_HTML" ]; then
-          ARGS+=("--report-html" "$INPUT_HTML")
-        fi
-        echo "⚡ Exécution : shorless ${ARGS[*]}"
+
         shorless "${ARGS[@]}"
 
-    - name: Upload CycloneDX 1.6 CBOM Artifact
-      if: ${{ always() && inputs.upload-artifact == 'true' }}
+    - name: Upload CycloneDX 1.6 CBOM & Executive HTML Report
+      if: always() && inputs.upload-artifact == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: cyclonedx-cbom-report
         path: |
-          ${{ inputs.output-cbom }}
-          ${{ inputs.report-html }}
+          ${{ inputs.output-cbom }}${{ inputs.report-html }}
         if-no-files-found: ignore

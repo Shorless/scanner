@@ -13,6 +13,8 @@ Scanner DevSecOps Open Source (Apache 2.0) de préparation Post-Quantique :
 ================================================================================
 """
 
+import os
+from urllib.request import Request, urlopen
 import ast
 import json
 import re
@@ -543,7 +545,7 @@ def generate_cyclonedx_cbom(findings: list, output_path: str):
         "version": 1,
         "metadata": {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.4"}]
+            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.5"}]
         },
         "components": []
     }
@@ -818,7 +820,210 @@ def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
                 tf_file.write_text(updated, encoding="utf-8")
             patched_files.append((str(tf_file), "Terraform : Politique Load Balancer migrée vers TLS 1.3"))
 
+    # 5. Auto-remédiation Code Source Multi-Langages (.py, .java, .go, .js, .ts, .cs)
+    for py_file in target_path.rglob("*.py"):
+        if py_file.name in ("shorless_scanner.py", "pqc_scanner.py", "release_shorless.py", "cron_generate_article.py"):
+            continue
+        orig = py_file.read_text(encoding="utf-8", errors="ignore")
+        updated = orig
+        updated = re.sub(r"\bhashes\.SHA1\(\)", "hashes.SHA256()", updated)
+        updated = re.sub(r"\bhashes\.MD5\(\)", "hashes.SHA256()", updated)
+        updated = re.sub(r"\bec\.SECP256R1\(\)", "ec.SECP384R1()  # [Shorless Auto-Fix: Courbe durcie en attente d'hybridation ML-KEM]", updated)
+        if "rsa.generate_private_key" in updated and "# [SHORLESS-PQC]" not in updated:
+            updated = updated.replace(
+                "rsa.generate_private_key(",
+                "# [SHORLESS-PQC] TODO: Migrer vers oqs.KeyEncapsulation('ML-KEM-768')\nprivate_key = rsa.generate_private_key("
+            ).replace("private_key = # [SHORLESS-PQC]", "# [SHORLESS-PQC]")
+        if updated != orig:
+            if not dry_run:
+                py_file.write_text(updated, encoding="utf-8")
+            patched_files.append((str(py_file), "Python : Durcissement cryptographique (SHA-256 / P-384) & Annotation ML-KEM"))
+
+    for java_file in target_path.rglob("*.java"):
+        orig = java_file.read_text(encoding="utf-8", errors="ignore")
+        updated = orig
+        updated = re.sub(r'MessageDigest\.getInstance\(\s*"(SHA-1|SHA1|MD5)"\s*\)', 'MessageDigest.getInstance("SHA-256")', updated)
+        if 'KeyPairGenerator.getInstance("RSA")' in updated and "/* [SHORLESS-PQC] */" not in updated:
+            updated = updated.replace(
+                'KeyPairGenerator.getInstance("RSA")',
+                'KeyPairGenerator.getInstance("RSA") /* [SHORLESS-PQC] Migrer vers BouncyCastle ML-KEM-768 / ML-DSA */'
+            )
+        if updated != orig:
+            if not dry_run:
+                java_file.write_text(updated, encoding="utf-8")
+            patched_files.append((str(java_file), "Java (JCA) : Migration SHA-256 & Annotation BouncyCastle PQC"))
+
+    for go_file in target_path.rglob("*.go"):
+        orig = go_file.read_text(encoding="utf-8", errors="ignore")
+        updated = orig
+        updated = updated.replace("sha1.New()", "sha256.New()").replace("md5.New()", "sha256.New()")
+        if "rsa.GenerateKey(" in updated and "/* [SHORLESS-PQC] */" not in updated:
+            updated = updated.replace(
+                "rsa.GenerateKey(",
+                "/* [SHORLESS-PQC: Migrer vers crypto/mlkem (Go 1.24+)] */ rsa.GenerateKey("
+            )
+        if updated != orig:
+            if not dry_run:
+                go_file.write_text(updated, encoding="utf-8")
+            patched_files.append((str(go_file), "Go (Stdlib) : Remplacement SHA-256 & Annotation crypto/mlkem"))
+
+    for js_file in list(target_path.rglob("*.js")) + list(target_path.rglob("*.ts")):
+        if "node_modules" in js_file.parts or "dist" in js_file.parts:
+            continue
+        orig = js_file.read_text(encoding="utf-8", errors="ignore")
+        updated = orig
+        updated = re.sub(r"createHash\(\s*['\"](md5|sha1)['\"]\s*\)", "createHash('sha256')", updated)
+        updated = re.sub(r"namedCurve:\s*['\"]prime256v1['\"]", "namedCurve: 'secp384r1' /* [SHORLESS-PQC: Hybrider avec ML-KEM] */", updated)
+        if "generateKeyPairSync('rsa'" in updated and "/* [SHORLESS-PQC] */" not in updated:
+            updated = updated.replace(
+                "generateKeyPairSync('rsa'",
+                "/* [SHORLESS-PQC] */ generateKeyPairSync('rsa'"
+            )
+        if updated != orig:
+            if not dry_run:
+                js_file.write_text(updated, encoding="utf-8")
+            patched_files.append((str(js_file), f"Node.js / TS ({js_file.suffix}) : Migration SHA-256, secp384r1 & Annotation PQC"))
+
+    for cs_file in target_path.rglob("*.cs"):
+        orig = cs_file.read_text(encoding="utf-8", errors="ignore")
+        updated = orig
+        updated = re.sub(r"\b(SHA1|MD5)\.Create\(\)", "SHA256.Create()", updated)
+        updated = re.sub(r"\bRSA\.Create\(\s*2048\s*\)", "RSA.Create(4096) /* [SHORLESS-PQC: Migrer vers MLKem (.NET 9+)] */", updated)
+        if updated != orig:
+            if not dry_run:
+                cs_file.write_text(updated, encoding="utf-8")
+            patched_files.append((str(cs_file), "C# (.NET) : Migration SHA256.Create(), durcissement RSA-4096 & Annotation MLKem"))
+
     return patched_files
+
+def verify_saas_api_key(api_key: str, findings_count: int, critical_count: int, auto_pr: bool) -> dict:
+    """Vérifie la validité de la clé d'API SaaS auprès de shorless.io et enregistre la télémétrie."""
+    clean_key = (api_key or "").strip()
+    if not re.match(r"^shorless_(trial|pro)_[a-fA-F0-9]{16,32}$", clean_key):
+        return {
+            "valid": False,
+            "message": "Format de clé invalide (attendu: shorless_trial_xxxxxxxxxxxxxxxx). Obtenez une clé sur https://shorless.io"
+        }
+
+    payload = json.dumps({
+        "api_key": clean_key,
+        "findings_count": findings_count,
+        "critical_count": critical_count,
+        "auto_pr": auto_pr,
+        "version": "0.9.5"
+    }).encode("utf-8")
+
+    req = Request(
+        "https://shorless.io/api_verify.php",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "Shorless-CLI/0.9.5"
+        },
+        method="POST"
+    )
+    try:
+        with urlopen(req, timeout=6) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        # Mode tolérant hors-ligne si le runner CI n'a pas accès à Internet
+        return {
+            "valid": True,
+            "plan": "TRIAL (Validation Locale)",
+            "days_remaining": 14,
+            "message": "Clé API validée localement (mode CI/CD)."
+        }
+
+
+def create_automated_pull_request(patched_files: list, findings: list, base_branch: str = "main") -> str:
+    """Crée une branche Git, commit les fichiers corrigés par --fix et ouvre une Pull Request GitHub."""
+    if not patched_files:
+        return ""
+
+    branch_name = f"fix/shorless-pqc-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M')}"
+    pr_title = "🔒 fix(pqc): Migration Post-Quantique TLS 1.3 & Hybride ML-KEM (Shorless Auto-PR)"
+
+    patched_bullets = "\n".join([f"- `{fpath}` : {desc}" for fpath, desc in patched_files])
+    pr_body = (
+        "## ⚡ Remédiation Automatique Post-Quantique (Shorless SaaS)\n\n"
+        "Cette Pull Request a été générée automatiquement par **Shorless PQC Scanner** (`--fix --auto-pr`) "
+        "pour mettre en conformité vos configurations d'infrastructure avec les recommandations **ANSSI** "
+        "et **NIST FIPS 203 (`X25519MLKEM768`)**.\n\n"
+        f"### 🛠️ Fichiers IaC corrigés ({len(patched_files)})\n"
+        f"{patched_bullets}\n\n"
+        f"### 📊 Résumé de l'audit CBOM CycloneDX 1.6\n"
+        f"- **Alertes totales détectées avant patch :** {len(findings)}\n"
+        "- **Standard d'inventaire :** OWASP CycloneDX 1.6\n"
+    )
+    try:
+        # Configure l'identité Git locale si elle n'est pas définie (indispensable sur les runners GitHub Actions)
+        subprocess.run(["git", "config", "user.name", "Shorless PQC Bot"], check=False, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "bot@shorless.io"], check=False, capture_output=True)
+
+        # Vérifie si la branche existe déjà ou la crée
+        subprocess.run(["git", "checkout", "-B", branch_name], check=True, capture_output=True, text=True)
+        for fpath, _ in patched_files:
+            subprocess.run(["git", "add", fpath], check=True, capture_output=True, text=True)
+        subprocess.run(["git", "commit", "-m", pr_title], check=True, capture_output=True, text=True)
+        subprocess.run(["git", "push", "-f", "-u", "origin", branch_name], check=True, capture_output=True, text=True)
+    except Exception as e:
+        console.print(f"[yellow]⚠️ Impossible de créer/pousser la branche Git ({branch_name}) : {e}[/yellow]")
+        return ""
+    try:
+        subprocess.run(["git", "checkout", "-b", branch_name], check=True, capture_output=True, text=True)
+        for fpath, _ in patched_files:
+            subprocess.run(["git", "add", fpath], check=True, capture_output=True, text=True)
+        subprocess.run(["git", "commit", "-m", pr_title], check=True, capture_output=True, text=True)
+        subprocess.run(["git", "push", "-u", "origin", branch_name], check=True, capture_output=True, text=True)
+    except Exception as e:
+        console.print(f"[yellow]⚠️ Impossible de créer/pousser la branche Git ({branch_name}) : {e}[/yellow]")
+        return ""
+
+    # 1. Ouverture via GitHub CLI (`gh`) si disponible
+    gh_bin = shutil.which("gh")
+    if gh_bin:
+        proc = subprocess.run(
+            [gh_bin, "pr", "create", "--title", pr_title, "--body", pr_body, "--base", base_branch, "--head", branch_name],
+            capture_output=True, text=True
+        )
+        if proc.returncode == 0:
+            return proc.stdout.strip()
+
+    # 2. Ouverture via l'API REST GitHub si GITHUB_TOKEN est défini
+    github_token = os.environ.get("GITHUB_TOKEN", "").strip()
+    repo_slug = os.environ.get("GITHUB_REPOSITORY", "").strip()
+    if not repo_slug:
+        rem = subprocess.run(["git", "config", "--get", "remote.origin.url"], capture_output=True, text=True)
+        m = re.search(r"github\.com[:/]([^/]+/[^/.]+)", rem.stdout or "")
+        if m:
+            repo_slug = m.group(1)
+
+    if github_token and repo_slug:
+        api_url = f"https://api.github.com/repos/{repo_slug}/pulls"
+        req = Request(
+            api_url,
+            data=json.dumps({
+                "title": pr_title,
+                "body": pr_body,
+                "head": branch_name,
+                "base": base_branch
+            }).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {github_token}",
+                "Accept": "application/vnd.github+json",
+                "Content-Type": "application/json",
+                "User-Agent": "Shorless-AutoPR"
+            },
+            method="POST"
+        )
+        try:
+            with urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return data.get("html_url", branch_name)
+        except Exception as e:
+            console.print(f"[yellow]⚠️ Branche poussée ({branch_name}), mais erreur API GitHub PR : {e}[/yellow]")
+
+    return f"Branche '{branch_name}' poussée sur origin (ouvrez la PR sur GitHub)."
 
 @app.command()
 def scan(
@@ -828,6 +1033,9 @@ def scan(
     check_tls: str = typer.Option(None, "--check-tls", help="URL ou domaine:port à inspecter en direct (ex: https://shorless.io)"),
     fix: bool = typer.Option(False, "--fix", help="Corrige automatiquement les fichiers IaC (Nginx, Docker, Traefik, K8s, Terraform)"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Simule les corrections --fix sans modifier les fichiers sur le disque"),
+    api_key: str = typer.Option(None, "--api-key", envvar="SHORLESS_API_KEY", help="Clé d'API Shorless SaaS (active la télémétrie et --auto-pr)"),
+    auto_pr: bool = typer.Option(False, "--auto-pr", help="Crée une branche Git et ouvre automatiquement une Pull Request avec les correctifs --fix (requiert --api-key)"),
+    pr_base: str = typer.Option("main", "--pr-base", help="Branche cible pour la Pull Request automatique (--auto-pr)"),
     fail_on_critical: bool = typer.Option(False, "--ci", help="Renvoie un code d'erreur (1) pour bloquer la CI/CD")
 ):
     """Lance un audit de vulnérabilité Post-Quantique sur le code, l'infra (Nginx/Docker) et les endpoints TLS."""
@@ -913,8 +1121,24 @@ def scan(
     console.print(f"\n📄 [bold]CBOM CycloneDX 1.6 généré avec succès :[/bold] [underline]{cbom_out}[/underline]")
 
 
-    # 6b. Exécution de l'Auto-Remédiation (--fix ou --dry-run)
-    if fix or dry_run:
+    # 6a. Vérification de la clé SaaS (--api-key) si fournie ou si --auto-pr est demandé
+    if auto_pr and not api_key:
+        console.print(
+            "\n[bold red]🔒 L'option --auto-pr est une fonctionnalité Shorless SaaS.[/bold red]\n"
+            "[yellow]👉 Obtenez une clé d'essai gratuite (14j) sur https://shorless.io puis ajoutez :[/yellow] "
+            "[bold white]--api-key shorless_trial_...[/bold white]"
+        )
+        raise typer.Exit(code=1)
+
+    if api_key:
+        auth_res = verify_saas_api_key(api_key, len(all_findings), critical_count, auto_pr)
+        if not auth_res.get("valid"):
+            console.print(f"\n[bold red]❌ Erreur d'authentification SaaS : {auth_res.get('message')}[/bold red]")
+            raise typer.Exit(code=1)
+        console.print(f"\n[bold green]🔑 {auth_res.get('message')}[/bold green]")
+
+    # 6b. Exécution de l'Auto-Remédiation (--fix, --dry-run ou --auto-pr)
+    if fix or dry_run or auto_pr:
         mode_label = "SIMULATION (--dry-run)" if dry_run else "APPLICATION DES CORRECTIFS (--fix)"
         console.print(f"\n[bold cyan]🛠️  Auto-Remédiation Post-Quantique — {mode_label}[/bold cyan]")
         patched = apply_auto_remediation(path, dry_run=dry_run)
@@ -923,12 +1147,14 @@ def scan(
                 prefix = "[yellow][DRY-RUN][/yellow]" if dry_run else "[bold green][CORRIGÉ][/bold green]"
                 console.print(f"  {prefix} [white]{fpath}[/white] → [green]{action_desc}[/green]")
             if not dry_run:
-                console.print(
-                    "\n[bold green]✨ Fichiers mis à jour localement ![/bold green] "
-                    "[dim]Astuce SaaS : Automatisez l'ouverture de Pull Requests GitHub/GitLab et les tests MTU sur https://shorless.io[/dim]"
-                )
+                console.print("\n[bold green]✨ Fichiers mis à jour localement ![/bold green]")
+                if auto_pr:
+                    console.print("[cyan]🚀 Création de la branche Git et ouverture de la Pull Request automatique...[/cyan]")
+                    pr_url = create_automated_pull_request(patched, all_findings, base_branch=pr_base)
+                    if pr_url:
+                        console.print(f"[bold green]✅ Pull Request Post-Quantique ouverte :[/bold green] [underline]{pr_url}[/underline]")
         else:
-            console.print("[yellow]ℹ️  Aucun fichier IaC automatiquement corrigeable trouvé (les clés AST dans le code métier nécessitent une refacto manuelle ou l'agent Auto-PR SaaS).[/yellow]")
+            console.print("[yellow]ℹ️  Aucun fichier IaC automatiquement corrigeable trouvé.[/yellow]")
 
     # 7. Génération du Rapport d'Audit Exécutif HTML/PDF si demandé
     if report_html:

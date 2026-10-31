@@ -1,5 +1,11 @@
 # Changelog — Shorless PQC & CBOM Scanner
 
+## [v0.9.5] — 2026-10-31 : Authentification SaaS (--api-key) & Pull Requests Automatiques (--auto-pr)
+- Ajout de l'authentification SaaS (--api-key / SHORLESS_API_KEY) reliée à l'endpoint api_verify.php
+- Ajout de l'option --auto-pr pour créer une branche Git dédiée et ouvrir automatiquement les Pull Requests de remédiation PQC
+- Mise à jour de la GitHub Action officielle (action.yml) avec injection automatique de GITHUB_TOKEN
+- Ajout des auto-remdiations de code multi-language
+
 ## [v0.9.4] — 2026-10-31 : Support Multi-Langages Backend (C# .NET)
 - Ajout du scan statique pour  C# .NET (.cs)
 - Validation unitaire automatisée sur 11 cibles (6 langages + 5 formats IaC) dans le CBOM CycloneDX 1.6 et le rapport exécutif HTML/PDF
