@@ -1,5 +1,9 @@
 # Changelog — Shorless PQC & CBOM Scanner
 
+## [v0.9.4] — 2026-10-31 : Support Multi-Langages Backend (C# .NET)
+- Ajout du scan statique pour  C# .NET (.cs)
+- Validation unitaire automatisée sur 11 cibles (6 langages + 5 formats IaC) dans le CBOM CycloneDX 1.6 et le rapport exécutif HTML/PDF
+
 ## [v0.9.3] — 2026-10-31 : Support Multi-Langages Backend (Java, Go, Node.js / TypeScript)
 - Ajout du scan Java, Go et Node.js/TS
 - Ajout des tests unitaires automatisés multi-langages

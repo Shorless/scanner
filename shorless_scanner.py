@@ -185,7 +185,28 @@ def scan_multilang_source(filepath: Path) -> list:
                     "risk": "ÉLEVÉ",
                     "remediation": "Utiliser crypto.createHash('sha256') ou 'sha3-256'."
                 })
-
+        # 4. Règles C# / .NET (System.Security.Cryptography)
+        elif suffix == ".cs":
+            if any(k in clean for k in ("RSA.Create(", "RSACryptoServiceProvider", "ECDsa.Create(", "ECDiffieHellman.Create(")):
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Code C# (.NET)",
+                    "detected": clean,
+                    "algo": ".NET RSA / ECDsa Asymétrique Classique (Vulnérable à Shor)",
+                    "risk": "CRITIQUE",
+                    "remediation": "Migrer vers System.Security.Cryptography.MLKem / MLDsa (.NET 9+) ou BouncyCastle.Cryptography PQC."
+                })
+            elif any(h in clean for h in ("SHA1.Create(", "SHA1Managed", "MD5.Create(", "MD5CryptoServiceProvider")):
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Code C# (.NET)",
+                    "detected": clean,
+                    "algo": "Hachage .NET SHA-1 / MD5 Obsolète",
+                    "risk": "ÉLEVÉ",
+                    "remediation": "Remplacer par SHA256.Create() ou SHA3_256.Create()."
+                })
     return findings
 
 def scan_nginx_config(filepath: Path) -> list:
@@ -438,7 +459,7 @@ def scan_yaml_iac(filepath: Path) -> list:
                 })
 
     # 2. Détection Traefik (tls.options, curvePreferences, minVersion)
-    is_traefik = (" tls:" in lower_content or "\ntls:" in lower_content) and (
+    is_traefik = ("tls:" in lower_content) and (
         "options:" in lower_content or "curvepreferences" in lower_content or "minversion" in lower_content or "entrypoints" in lower_content
     )
     if is_traefik:
@@ -522,7 +543,7 @@ def generate_cyclonedx_cbom(findings: list, output_path: str):
         "version": 1,
         "metadata": {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.3"}]
+            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.4"}]
         },
         "components": []
     }
@@ -763,7 +784,7 @@ def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
 
     # 3. Auto-remédiation YAML (Traefik & Kubernetes Ingress)
     for yaml_file in list(target_path.rglob("*.yml")) + list(target_path.rglob("*.yaml")):
-        if ".github" in yaml_file.parts:
+        if ".github" in yaml_file.parts or yaml_file.name == "action.yml":
             continue
         orig = yaml_file.read_text(encoding="utf-8", errors="ignore")
         updated = orig
@@ -827,8 +848,8 @@ def scan(
                 all_findings.extend(visitor.findings)
             except SyntaxError:
                 pass
-        # 1b. Scan des fichiers Multi-Langages Backend (.java, .go, .js, .ts)
-        for ext in ("*.java", "*.go", "*.js", "*.ts"):
+        # 1b. Scan des fichiers Multi-Langages Backend (.java, .go, .js, .ts, "*.cs")
+        for ext in ("*.java", "*.go", "*.js", "*.ts", "*.cs"):
             for src_file in path.rglob(ext):
                 if "node_modules" in src_file.parts or "vendor" in src_file.parts or "dist" in src_file.parts:
                     continue
@@ -848,7 +869,7 @@ def scan(
                 all_findings.extend(scan_dockerfile(item))
         # 3b. Scan des configurations YAML (Traefik & Kubernetes Ingress)
         for yaml_file in list(path.rglob("*.yml")) + list(path.rglob("*.yaml")):
-            if ".github" in yaml_file.parts:
+            if ".github" in yaml_file.parts or yaml_file.name == "action.yml":
                 continue
             all_findings.extend(scan_yaml_iac(yaml_file))
 
@@ -900,7 +921,7 @@ def scan(
         if patched:
             for fpath, action_desc in patched:
                 prefix = "[yellow][DRY-RUN][/yellow]" if dry_run else "[bold green][CORRIGÉ][/bold green]"
-                console.print(f"  {prefix} [white]{fpath}[/white] → [emerald]{action_desc}[/emerald]")
+                console.print(f"  {prefix} [white]{fpath}[/white] → [green]{action_desc}[/green]")
             if not dry_run:
                 console.print(
                     "\n[bold green]✨ Fichiers mis à jour localement ![/bold green] "
@@ -909,15 +930,16 @@ def scan(
         else:
             console.print("[yellow]ℹ️  Aucun fichier IaC automatiquement corrigeable trouvé (les clés AST dans le code métier nécessitent une refacto manuelle ou l'agent Auto-PR SaaS).[/yellow]")
 
-    # 7. Mode bloqueur CI/CD (GitHub Actions / GitLab CI)
+    # 7. Génération du Rapport d'Audit Exécutif HTML/PDF si demandé
+    if report_html:
+        generate_executive_html_report(all_findings, report_html, target_dir)
+        console.print(f"📊 [bold]Rapport Exécutif HTML/PDF généré :[/bold] [underline]{report_html}[/underline]")
+
+    # 8. Mode bloqueur CI/CD (GitHub Actions / GitLab CI)
     if fail_on_critical and critical_count > 0:
         console.print(f"\n[bold red]❌ Pipeline CI bloquée : {critical_count} vulnérabilité(s) critique(s) face au risque quantique.[/bold red]")
         raise typer.Exit(code=1)
 
-    # 7b. Génération du Rapport d'Audit Exécutif HTML/PDF si demandé
-    if report_html:
-        generate_executive_html_report(all_findings, report_html, target_dir)
-        console.print(f"📊 [bold]Rapport Exécutif HTML/PDF généré :[/bold] [underline]{report_html}[/underline]")
 
 if __name__ == "__main__":
     app()

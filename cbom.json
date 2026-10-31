@@ -1,15 +1,15 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:4a7d776b-c244-4113-b073-eb1624703fdc",
+  "serialNumber": "urn:uuid:e51693c3-7516-45df-bd30-e96039105d81",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-31T12:15:24.416396+00:00",
+    "timestamp": "2026-10-31T12:33:01.775149+00:00",
     "tools": [
       {
         "vendor": "Shorless",
         "name": "shorless-scanner",
-        "version": "0.9.3"
+        "version": "0.9.4"
       }
     ]
   },
@@ -107,6 +107,78 @@
     {
       "type": "cryptographic-asset",
       "bom-ref": "crypto-asset-5",
+      "name": "Hachage Node.js SHA-1 / MD5 Obsolète",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\jwt_signer.js",
+            "line": 3
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Utiliser crypto.createHash('sha256') ou 'sha3-256'."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-6",
+      "name": "Node.js crypto RSA / ECDSA (Vulnérable à Shor)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\token_service.ts",
+            "line": 2
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Migrer vers un binding liboqs / OpenSSL 3.2+ ou WebCrypto supportant ML-KEM (FIPS 203) et ML-DSA (FIPS 204)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-7",
+      "name": ".NET RSA / ECDsa Asymétrique Classique (Vulnérable à Shor)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\AuthController.cs",
+            "line": 4
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Migrer vers System.Security.Cryptography.MLKem / MLDsa (.NET 9+) ou BouncyCastle.Cryptography PQC."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-8",
+      "name": "Hachage .NET SHA-1 / MD5 Obsolète",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\AuthController.cs",
+            "line": 5
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Remplacer par SHA256.Create() ou SHA3_256.Create()."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-9",
       "name": "TLS < 1.3",
       "evidence": {
         "occurrences": [
@@ -124,7 +196,7 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-6",
+      "bom-ref": "crypto-asset-10",
       "name": "Échange de clés ECDHE classique",
       "evidence": {
         "occurrences": [
@@ -142,7 +214,7 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-7",
+      "bom-ref": "crypto-asset-11",
       "name": "Image OS Legacy (OpenSSL < 3.2)",
       "evidence": {
         "occurrences": [
@@ -160,7 +232,7 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-8",
+      "bom-ref": "crypto-asset-12",
       "name": "OpenSSL Obsolète (Incompatible PQC)",
       "evidence": {
         "occurrences": [
@@ -178,7 +250,7 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-9",
+      "bom-ref": "crypto-asset-13",
       "name": "Génération de clé RSA/ECC dans l'image",
       "evidence": {
         "occurrences": [
@@ -196,7 +268,43 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-10",
+      "bom-ref": "crypto-asset-14",
+      "name": "Traefik TLS minVersion < 1.3",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\traefik.yml",
+            "line": 4
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Définir 'minVersion: VersionTLS13' dans tls.options de Traefik."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-15",
+      "name": "Traefik ECDHE Classique",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\traefik.yml",
+            "line": 1
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Configurer 'curvePreferences: [X25519MLKEM768, X25519]' dans tls.options (Traefik v3.1+)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-16",
       "name": "Annotation Ingress TLS < 1.3",
       "evidence": {
         "occurrences": [
@@ -214,7 +322,7 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-11",
+      "bom-ref": "crypto-asset-17",
       "name": "K8s Ingress ECDHE Classique",
       "evidence": {
         "occurrences": [
@@ -232,7 +340,7 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-12",
+      "bom-ref": "crypto-asset-18",
       "name": "Génération de clé Terraform RSA / ECDSA (Vulnérable à Shor)",
       "evidence": {
         "occurrences": [
@@ -250,7 +358,7 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-13",
+      "bom-ref": "crypto-asset-19",
       "name": "Politique Cloud Load Balancer / CDN < TLS 1.3",
       "evidence": {
         "occurrences": [
