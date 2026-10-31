@@ -1,0 +1,408 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+================================================================================
+SHORLESS PQC & CBOM SCANNER (shorless_scanner.py)
+================================================================================
+Scanner DevSecOps Open Source (Apache 2.0) de préparation Post-Quantique :
+1. Analyse statique AST Python (RSA, ECDSA P-256, SHA-1, MD5).
+2. Inspection des configurations TLS Nginx (.conf) et courbes hybrides ML-KEM.
+3. Inspection des Dockerfiles (Dockerfile, Dockerfile.*, *.dockerfile) et versions OpenSSL.
+4. Inspection en direct des terminaisons TLS distantes (--check-tls https://...).
+5. Génération native de l'inventaire CBOM au standard OWASP CycloneDX 1.6 (cbom.json).
+================================================================================
+"""
+
+import ast
+import json
+import re
+import shutil
+import socket
+import ssl
+import subprocess
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from urllib.parse import urlparse
+import typer
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+
+app = typer.Typer(help="Scanner DevSecOps de préparation Post-Quantique (PQC) & Générateur CBOM CycloneDX 1.6")
+console = Console()
+
+# Base de connaissances PQC (Règles NIST FIPS 203/204 & ANSSI)
+PQC_RULES = {
+    "generate_private_key": {
+        "algo": "RSA / ECC (Asymétrique)",
+        "risk": "CRITIQUE",
+        "reason": "Vulnérable à l'algorithme de Shor (Harvest Now, Decrypt Later).",
+        "remediation": "Migrer vers une approche hybride (ex: X25519 + ML-KEM-768) ou signatures ML-DSA."
+    },
+    "SECP256R1": {
+        "algo": "ECDSA / ECDH (P-256)",
+        "risk": "CRITIQUE",
+        "reason": "Courbe elliptique classique cassable par un ordinateur quantique cryptographiquement pertinent.",
+        "remediation": "Utiliser liboqs / OpenSSL 3.2+ avec un provider OQS pour hybrider la courbe."
+    },
+    "SECP384R1": {
+        "algo": "ECDSA / ECDH (P-384)",
+        "risk": "CRITIQUE",
+        "reason": "Courbe elliptique classique vulnérable à l'algorithme de Shor.",
+        "remediation": "Hybrider l'échange de clés avec ML-KEM-768 ou ML-KEM-1024 (NIST FIPS 203)."
+    },
+    "SHA1": {
+        "algo": "SHA-1 (Hachage)",
+        "risk": "ÉLEVÉ",
+        "reason": "Obsolète (collisions classiques + affaiblissement par l'algorithme de Grover).",
+        "remediation": "Remplacer par SHA-256, SHA-384 ou SHA-3."
+    },
+    "MD5": {
+        "algo": "MD5 (Hachage)",
+        "risk": "ÉLEVÉ",
+        "reason": "Totalement compromis.",
+        "remediation": "Remplacer par SHA-256 ou SHA-3."
+    }
+}
+
+
+class PythonCryptoVisitor(ast.NodeVisitor):
+    """Analyse l'arbre syntaxique (AST) du code Python pour détecter les appels cryptographiques."""
+    def __init__(self, filepath: str):
+        self.filepath = filepath
+        self.findings = []
+
+    def visit_Call(self, node: ast.Call):
+        func_name = ""
+        if isinstance(node.func, ast.Attribute):
+            func_name = node.func.attr
+        elif isinstance(node.func, ast.Name):
+            func_name = node.func.id
+
+        if func_name in PQC_RULES:
+            rule = PQC_RULES[func_name]
+            self.findings.append({
+                "file": self.filepath,
+                "line": node.lineno,
+                "type": "Code Python (AST)",
+                "detected": func_name,
+                "algo": rule["algo"],
+                "risk": rule["risk"],
+                "remediation": rule["remediation"]
+            })
+        self.generic_visit(node)
+
+
+def scan_nginx_config(filepath: Path) -> list:
+    """Scanne les fichiers de configuration Nginx pour vérifier la présence de TLS hybride PQC."""
+    findings = []
+    content = filepath.read_text(encoding="utf-8", errors="ignore")
+    lines = content.splitlines()
+
+    has_ssl = False
+    has_pqc_curves = False
+
+    for i, line in enumerate(lines, start=1):
+        clean_line = line.strip()
+        if clean_line.startswith("#"):
+            continue
+        if "ssl_protocols" in clean_line:
+            has_ssl = True
+            if "TLSv1.3" not in clean_line:
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Infra (Nginx)",
+                    "detected": clean_line,
+                    "algo": "TLS < 1.3",
+                    "risk": "CRITIQUE",
+                    "remediation": "Activer TLSv1.3 (prérequis obligatoire pour l'échange de clés post-quantique ML-KEM)."
+                })
+        if "ssl_ecdh_curve" in clean_line:
+            if "MLKEM" in clean_line.upper() or "KYBER" in clean_line.upper():
+                has_pqc_curves = True
+
+    if has_ssl and not has_pqc_curves:
+        findings.append({
+            "file": str(filepath),
+            "line": 1,
+            "type": "Infra (Nginx)",
+            "detected": "Absence de courbe hybride PQC",
+            "algo": "Échange de clés ECDHE classique",
+            "risk": "MOYEN",
+            "remediation": "Ajouter 'ssl_ecdh_curve X25519MLKEM768:X25519;' (Supporté dès OpenSSL 3.2+ / Nginx récent)."
+        })
+    return findings
+
+
+def scan_dockerfile(filepath: Path) -> list:
+    """Scanne les Dockerfiles pour détecter les images ou versions d'OpenSSL incompatibles avec la PQC."""
+    findings = []
+    content = filepath.read_text(encoding="utf-8", errors="ignore")
+    lines = content.splitlines()
+
+    legacy_base_patterns = (
+        "buster", "stretch", "bullseye", "ubuntu:18.04", "ubuntu:20.04",
+        "alpine:3.12", "alpine:3.13", "alpine:3.14", "alpine:3.15", "alpine:3.16", "alpine:3.17", "alpine:3.18"
+    )
+
+    for i, line in enumerate(lines, start=1):
+        clean_line = line.strip()
+        if not clean_line or clean_line.startswith("#"):
+            continue
+
+        lower_line = clean_line.lower()
+
+        # 1. Vérification de l'image de base (FROM)
+        if lower_line.startswith("from "):
+            if any(pat in lower_line for pat in legacy_base_patterns):
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Conteneur (Docker)",
+                    "detected": clean_line,
+                    "algo": "Image OS Legacy (OpenSSL < 3.2)",
+                    "risk": "ÉLEVÉ",
+                    "remediation": "Migrer vers une image de base récente (ex: debian:trixie, ubuntu:24.04, alpine:3.20+) embarquant OpenSSL 3.2+."
+                })
+
+        # 2. Vérification d'installation explicite d'OpenSSL obsolète (1.1.x, 1.0.x, 3.0.x)
+        if "openssl" in lower_line and any(ver in lower_line for ver in ("1.1.", "1.0.", "3.0.", "libssl1.1")):
+            findings.append({
+                "file": str(filepath),
+                "line": i,
+                "type": "Conteneur (Docker)",
+                "detected": clean_line,
+                "algo": "OpenSSL Obsolète (Incompatible PQC)",
+                "risk": "CRITIQUE",
+                "remediation": "Mettre à niveau vers OpenSSL 3.2+ (ou 3.5+) avec oqs-provider pour supporter ML-KEM (FIPS 203) et ML-DSA (FIPS 204)."
+            })
+
+        # 3. Détection de génération de clés RSA/ECDSA en ligne de commande dans le Dockerfile
+        if "openssl genrsa" in lower_line or "ssh-keygen -t rsa" in lower_line or "ecparam" in lower_line:
+            findings.append({
+                "file": str(filepath),
+                "line": i,
+                "type": "Conteneur (Docker)",
+                "detected": clean_line,
+                "algo": "Génération de clé RSA/ECC dans l'image",
+                "risk": "CRITIQUE",
+                "remediation": "Ne pas générer de clés asymétriques classiques dans le build Docker ; utiliser des certificats hybrides injectés au runtime."
+            })
+
+    return findings
+
+
+def scan_live_tls_endpoint(target_url: str) -> list:
+    """Inspecte un endpoint TLS en direct pour vérifier TLS 1.3, le certificat et l'hybridation PQC."""
+    findings = []
+
+    if "://" not in target_url:
+        target_url = f"https://{target_url}"
+    parsed = urlparse(target_url)
+    hostname = parsed.hostname or target_url
+    port = parsed.port or 443
+    endpoint_label = f"{hostname}:{port}"
+
+    console.print(f"[cyan]🌐 Inspection TLS en direct sur :[/cyan] [bold white]{endpoint_label}[/bold white]")
+
+    tls_version = None
+    cipher_name = None
+    try:
+        ctx = ssl.create_default_context()
+        with socket.create_connection((hostname, port), timeout=6) as sock:
+            with ctx.wrap_socket(sock, server_hostname=hostname) as ssock:
+                tls_version = ssock.version()
+                cipher_info = ssock.cipher()
+                cipher_name = cipher_info[0] if cipher_info else "Inconnu"
+    except Exception as e:
+        findings.append({
+            "file": endpoint_label,
+            "line": port,
+            "type": "Réseau (TLS Live)",
+            "detected": f"Erreur de connexion : {e}",
+            "algo": "Endpoint TLS Injoignable / Invalide",
+            "risk": "ÉLEVÉ",
+            "remediation": "Vérifier l'accessibilité réseau, le pare-feu et la validité de la chaîne de certificats X.509."
+        })
+        return findings
+
+    if tls_version != "TLSv1.3":
+        findings.append({
+            "file": endpoint_label,
+            "line": port,
+            "type": "Réseau (TLS Live)",
+            "detected": f"Protocole négocié : {tls_version} ({cipher_name})",
+            "algo": f"{tls_version} (< TLS 1.3)",
+            "risk": "CRITIQUE",
+            "remediation": "Activer TLSv1.3 sur le reverse-proxy / Load Balancer (requis pour l'échange de clés hybride ML-KEM)."
+        })
+
+    openssl_bin = shutil.which("openssl")
+    negotiated_group = ""
+    cert_sig_algo = ""
+
+    if openssl_bin:
+        try:
+            proc = subprocess.run(
+                [openssl_bin, "s_client", "-connect", endpoint_label, "-servername", hostname, "-brief"],
+                input="",
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="ignore",
+                timeout=6
+            )
+            output = (proc.stdout or "") + "\n" + (proc.stderr or "")
+            for line in output.splitlines():
+                low = line.lower()
+                if "Server Temp Key" in line or "Peer Temp Key" in line or "Negotiated TLS1.3 group" in line:
+                    negotiated_group = line.strip()
+                elif "peer signing digest" in low or "signature type" in low:
+                    cert_sig_algo = line.strip()
+        except Exception:
+            pass
+
+    is_pqc_hybrid = any(k in negotiated_group.upper() for k in ("MLKEM", "KYBER"))
+    if not is_pqc_hybrid:
+        detected_kem = negotiated_group if negotiated_group else f"Handshake {tls_version} ({cipher_name}) sans KEM hybride"
+        findings.append({
+            "file": endpoint_label,
+            "line": port,
+            "type": "Réseau (TLS Live)",
+            "detected": detected_kem,
+            "algo": "Échange de clés TLS non hybridé (ECDHE classique)",
+            "risk": "MOYEN",
+            "remediation": "Activer la courbe hybride 'X25519MLKEM768:X25519' (OpenSSL 3.2+ / Nginx / Cloudflare) contre Harvest Now, Decrypt Later."
+        })
+    else:
+        console.print(f"[bold green]🔒 Échange de clés hybride Post-Quantique actif sur {endpoint_label} ({negotiated_group})[/bold green]")
+
+    findings.append({
+        "file": endpoint_label,
+        "line": port,
+        "type": "Certificat (X.509)",
+        "detected": cert_sig_algo or f"Certificat leaf sur {cipher_name}",
+        "algo": "Certificat X.509 Asymétrique Classique (RSA/ECDSA)",
+        "risk": "MOYEN",
+        "remediation": "Inventorié dans le CBOM. Planifier la migration PKI vers des certificats hybrides ou ML-DSA (FIPS 204) d'ici 2028-2030."
+    })
+
+    return findings
+
+
+def generate_cyclonedx_cbom(findings: list, output_path: str):
+    """Génère un fichier CBOM (Cryptography Bill of Materials) au format standard CycloneDX 1.6."""
+    cbom = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.6",
+        "serialNumber": f"urn:uuid:{uuid.uuid4()}",
+        "version": 1,
+        "metadata": {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.8.6"}]
+        },
+        "components": []
+    }
+
+    for idx, f in enumerate(findings):
+        cbom["components"].append({
+            "type": "cryptographic-asset",
+            "bom-ref": f"crypto-asset-{idx}",
+            "name": f["algo"],
+            "evidence": {
+                "occurrences": [{"location": f["file"], "line": f["line"]}]
+            },
+            "cryptoProperties": {
+                "assetType": "algorithm",
+                "quantumSafe": "false",
+                "remediation": f["remediation"]
+            }
+        })
+
+    Path(output_path).write_text(json.dumps(cbom, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+@app.command()
+def scan(
+    target_dir: str = typer.Argument(".", help="Dossier du projet à scanner"),
+    cbom_out: str = typer.Option("cbom.json", "--cbom", help="Fichier de sortie CycloneDX CBOM"),
+    check_tls: str = typer.Option(None, "--check-tls", help="URL ou domaine:port à inspecter en direct (ex: https://shorless.io)"),
+    fail_on_critical: bool = typer.Option(False, "--ci", help="Renvoie un code d'erreur (1) pour bloquer la CI/CD")
+):
+    """Lance un audit de vulnérabilité Post-Quantique sur le code, l'infra (Nginx/Docker) et les endpoints TLS."""
+    console.print(Panel.fit("[bold cyan]⚡ Shorless PQC-Scanner - Audit DevSecOps Post-Quantique[/bold cyan]"))
+
+    path = Path(target_dir)
+    all_findings = []
+
+    if path.exists():
+        # 1. Scan des fichiers Python (.py)
+        for py_file in path.rglob("*.py"):
+            if py_file.name in ("shorless_scanner.py", "pqc_scanner.py", "release_shorless.py", "cron_generate_article.py"):
+                continue
+            try:
+                tree = ast.parse(py_file.read_text(encoding="utf-8", errors="ignore"))
+                visitor = PythonCryptoVisitor(str(py_file))
+                visitor.visit(tree)
+                all_findings.extend(visitor.findings)
+            except SyntaxError:
+                pass
+
+        # 2. Scan des configurations Nginx (.conf)
+        for conf_file in path.rglob("*.conf"):
+            all_findings.extend(scan_nginx_config(conf_file))
+
+        # 3. Scan des Dockerfiles (Dockerfile, Dockerfile.*, *.dockerfile)
+        for item in path.rglob("*"):
+            if item.is_file() and (
+                item.name == "Dockerfile"
+                or item.name.startswith("Dockerfile.")
+                or item.name.lower().endswith(".dockerfile")
+            ):
+                all_findings.extend(scan_dockerfile(item))
+
+    # 4. Scan TLS en direct si --check-tls est fourni
+    if check_tls:
+        all_findings.extend(scan_live_tls_endpoint(check_tls))
+
+    # 5. Affichage des résultats dans le terminal
+    if not all_findings:
+        console.print("[bold green]✅ Aucune vulnérabilité post-quantique détectée ![/bold green]")
+        raise typer.Exit(0)
+
+    table = Table(title=f"Inventaire Cryptographique & Risques Quantiques ({len(all_findings)} alertes)")
+    table.add_column("Fichier / Endpoint", style="cyan")
+    table.add_column("Source", style="magenta")
+    table.add_column("Actif / Algorithme détecté", style="white")
+    table.add_column("Risque PQC", style="bold")
+    table.add_column("Plan de remédiation (Auto-PR disponible en SaaS)", style="green")
+
+    critical_count = 0
+    for f in all_findings:
+        risk_color = "red" if f["risk"] == "CRITIQUE" else "yellow"
+        if f["risk"] == "CRITIQUE":
+            critical_count += 1
+        table.add_row(
+            f"{f['file']}:{f['line']}",
+            f["type"],
+            f["algo"],
+            f"[{risk_color}]{f['risk']}[/{risk_color}]",
+            f["remediation"]
+        )
+
+    console.print(table)
+
+    # 6. Export du CBOM CycloneDX 1.6
+    generate_cyclonedx_cbom(all_findings, cbom_out)
+    console.print(f"\n📄 [bold]CBOM CycloneDX 1.6 généré avec succès :[/bold] [underline]{cbom_out}[/underline]")
+
+    # 7. Mode bloqueur CI/CD (GitHub Actions / GitLab CI)
+    if fail_on_critical and critical_count > 0:
+        console.print(f"\n[bold red]❌ Pipeline CI bloquée : {critical_count} vulnérabilité(s) critique(s) face au risque quantique.[/bold red]")
+        raise typer.Exit(code=1)
+
+
+if __name__ == "__main__":
+    app()

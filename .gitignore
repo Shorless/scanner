@@ -1,0 +1,7 @@
+site/
+dist/
+INIT.md
+build/
+*.egg-info/
+__pycache__/
+test_env/cbom_test.json
