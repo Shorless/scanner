@@ -1,6 +1,7 @@
 site/
 dist/
 INIT.md
+release_shorless.py
 build/
 *.egg-info/
 __pycache__/
