@@ -1,6 +1,7 @@
 # ⚡ Shorless — Post-Quantum (PQC) DevSecOps Scanner & CycloneDX 1.6 CBOM Generator
 
 [![PyPI version](https://img.shields.io/badge/pypi-v0.9.6-10B981.svg)](https://pypi.org/project/shorless/)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Shorless%20PQC%20Action-2088FF.svg?logo=github-actions&logoColor=white)](https://github.com/marketplace/actions/shorless-pqc-cyclonedx-1-6-cbom-scanner)
 [![GitHub Release](https://img.shields.io/badge/release-v0.9.6-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v0.9.6)
 [![License](https://img.shields.io/badge/license-Apache%202.0-3B82F6.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CycloneDX 1.6](https://img.shields.io/badge/CBOM-CycloneDX%201.6-A855F7.svg)](https://cyclonedx.org/capabilities/cbom/)
@@ -12,11 +13,9 @@
 
 ---
 
-## 🆕 Nouveautés de la version v0.9.6 (Auto-PR Multi-Langages (11 cibles) & Console SaaS CBOM)
+## 🆕 Nouveautés de la version v0.9.6 (Test)
 
-- Extension de l'auto-remédiation (--fix et --auto-pr) aux 11 cibles (6 langages Backend + 5 formats IaC)
-- Fiabilisation de la création de branches Git et Pull Requests automatiques
-- Déploiement de la Console SaaS CBOM (dashboard.html, api_dashboard.php) et du Webhook Stripe Pro (api_stripe_webhook.php)
+- Test
 
 ---
 
