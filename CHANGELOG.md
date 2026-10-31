@@ -1,5 +1,10 @@
 # Changelog — Shorless PQC & CBOM Scanner
 
+## [v0.9.2] — 2026-10-31 : Générateur de Rapport d'Audit Exécutif HTML/PDF (--report-html)
+- Ajout de l'option --report-html générant un rapport exécutif HTML/PDF autonome avec Score de Maturité PQC (/100)
+- Synthèse de conformité réglementaire ANSSI, NIST FIPS 203/204, NIS 2 et DORA prête pour les RSSI et CTO
+- Mise à jour de la documentation CLI, de la GitHub Action et des tests automatisés
+
 ## [v0.9.1] — 2026-10-31 : Documentation CLI Complète, GitHub Action Officielle & Auto-Fix Multi-IaC
 - Documentation complète de toutes les options CLI (--check-tls, --fix, --dry-run, --cbom, --ci)
 - Ajout de la GitHub Action officielle (action.yml) avec upload automatique de l'artefact CBOM

@@ -428,7 +428,7 @@ def generate_cyclonedx_cbom(findings: list, output_path: str):
         "version": 1,
         "metadata": {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.1"}]
+            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.2"}]
         },
         "components": []
     }
@@ -449,6 +449,168 @@ def generate_cyclonedx_cbom(findings: list, output_path: str):
         })
 
     Path(output_path).write_text(json.dumps(cbom, indent=2, ensure_ascii=False), encoding="utf-8")
+
+def generate_executive_html_report(findings: list, output_path: str, target_dir: str):
+    """Génère un rapport d'audit exécutif HTML/PDF autonome pour RSSI, CTO et auditeurs NIS 2 / DORA."""
+    now_str = datetime.now(timezone.utc).strftime("%d/%m/%Y à %H:%M UTC")
+    total = len(findings)
+    crit_count = sum(1 for f in findings if f["risk"] == "CRITIQUE")
+    high_count = sum(1 for f in findings if f["risk"] == "ÉLEVÉ")
+    med_count = sum(1 for f in findings if f["risk"] == "MOYEN")
+
+    # Calcul du Score de Maturité Post-Quantique (0 à 100)
+    penalty = (crit_count * 18) + (high_count * 10) + (med_count * 5)
+    score = max(0, 100 - penalty)
+
+    if score >= 80:
+        grade, badge_color, status_text = "A — Prêt pour l'ère Post-Quantique", "#10B981", "CONFORME"
+    elif score >= 50:
+        grade, badge_color, status_text = "C — Transition Hybride Requise", "#F59E0B", "EXPOSITION MODÉRÉE"
+    else:
+        grade, badge_color, status_text = "E — Vulnérable à l'Algorithme de Shor", "#EF4444", "NON CONFORME (RISQUE CRITIQUE)"
+
+    rows_html = []
+    for f in findings:
+        r_color = "#EF4444" if f["risk"] == "CRITIQUE" else ("#F59E0B" if f["risk"] == "ÉLEVÉ" else "#3B82F6")
+        rows_html.append(f"""
+        <tr>
+            <td class="mono">{f['file']}:{f['line']}</td>
+            <td><span class="tag">{f['type']}</span></td>
+            <td><strong>{f['algo']}</strong><br><span class="detected">{f['detected']}</span></td>
+            <td><span class="badge" style="background:{r_color}20;color:{r_color};border:1px solid {r_color}50;">{f['risk']}</span></td>
+            <td>{f['remediation']}</td>
+        </tr>""")
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport d'Audit Exécutif Post-Quantique (CBOM) — Shorless.io</title>
+    <style>
+        :root {{ --bg: #0B0F17; --card: #111827; --text: #F3F4F6; --muted: #9CA3AF; --accent: #10B981; --border: #1F2937; }}
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); padding: 32px; line-height: 1.5; }}
+        .container {{ max-width: 1100px; margin: 0 auto; }}
+        .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 28px; }}
+        .brand {{ font-family: monospace; font-size: 22px; font-weight: 800; color: #fff; }}
+        .brand span {{ color: var(--accent); }}
+        .btn-print {{ background: var(--accent); color: #06080D; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px; }}
+        .grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }}
+        .card {{ background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }}
+        .card-title {{ font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 8px; font-family: monospace; }}
+        .score-val {{ font-size: 36px; font-weight: 800; font-family: monospace; }}
+        .section-title {{ font-size: 18px; font-weight: 700; margin: 28px 0 14px; color: #fff; }}
+        table {{ width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); font-size: 13px; }}
+        th {{ background: #06080D; color: var(--muted); text-align: left; padding: 12px 14px; font-family: monospace; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid var(--border); }}
+        td {{ padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }}
+        .mono {{ font-family: monospace; color: #38BDF8; font-size: 12px; word-break: break-all; }}
+        .detected {{ font-family: monospace; font-size: 11px; color: var(--muted); }}
+        .tag {{ background: #1F2937; color: #E5E7EB; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-family: monospace; }}
+        .badge {{ padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; font-family: monospace; display: inline-block; }}
+        .compliance-box {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }}
+        .cta-box {{ margin-top: 32px; background: linear-gradient(135deg, #064E3B 0%, #0F172A 100%); border: 1px solid #10B98150; border-radius: 12px; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; }}
+        .footer {{ margin-top: 32px; text-align: center; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 16px; font-family: monospace; }}
+        @media print {{
+            body {{ background: #fff; color: #111; padding: 0; }}
+            .card, table, .cta-box {{ background: #fff !important; border: 1px solid #ccc !important; color: #111 !important; }}
+            th {{ background: #f3f4f6 !important; color: #111 !important; }}
+            .brand, .section-title, strong {{ color: #000 !important; }}
+            .btn-print {{ display: none !important; }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <div class="brand">⚡ shorless<span>.io</span> — Rapport d'Audit Exécutif PQC &amp; CBOM</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:4px;font-family:monospace;">
+                    Périmètre audité : {target_dir} • Généré le {now_str} • Standard OWASP CycloneDX 1.6
+                </div>
+            </div>
+            <button class="btn-print" onclick="window.print()">🖨️ Imprimer / Exporter en PDF</button>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <div class="card-title">Score de Maturité PQC</div>
+                <div class="score-val" style="color:{badge_color};">{score}/100</div>
+                <div style="font-size:12px;color:{badge_color};font-weight:600;margin-top:4px;">{grade}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Risques Critiques (Shor)</div>
+                <div class="score-val" style="color:#EF4444;">{crit_count}</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:4px;">Clés RSA/ECC &amp; TLS &lt; 1.3</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Risques Élevés (Grover / OS)</div>
+                <div class="score-val" style="color:#F59E0B;">{high_count}</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:4px;">SHA-1, MD5, Images Legacy</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Risques Moyens (Non-Hybridé)</div>
+                <div class="score-val" style="color:#3B82F6;">{med_count}</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:4px;">Absence de KEM X25519MLKEM768</div>
+            </div>
+        </div>
+
+        <div class="section-title">1. État de Conformité Réglementaire &amp; Normative</div>
+        <div class="compliance-box">
+            <div class="card">
+                <div class="card-title">NIST FIPS 203 (ML-KEM) &amp; FIPS 204</div>
+                <div style="font-weight:700;color:{badge_color};margin-bottom:6px;">{status_text}</div>
+                <p style="font-size:12px;color:var(--muted);">Vérifie l'encapsulation de clés post-quantique hybride et le remplacement des primitives RSA/ECDSA vulnérables à l'algorithme de Shor.</p>
+            </div>
+            <div class="card">
+                <div class="card-title">Recommandations ANSSI (Hybridation)</div>
+                <div style="font-weight:700;color:{'#10B981' if crit_count == 0 else '#EF4444'};margin-bottom:6px;">
+                    {'PRÉREQUIS TLS 1.3 VALIDÉ' if crit_count == 0 else 'ACTION REQUISE SUR TLS / ASYMÉTRIQUE'}
+                </div>
+                <p style="font-size:12px;color:var(--muted);">L'ANSSI recommande l'hybridation systématique associant un algorithme classique (X25519) à un KEM post-quantique (ML-KEM-768) dès 2026.</p>
+            </div>
+            <div class="card">
+                <div class="card-title">Directives UE NIS 2 &amp; DORA (Art. 21)</div>
+                <div style="font-weight:700;color:#10B981;margin-bottom:6px;">INVENTAIRE CBOM GÉNÉRÉ</div>
+                <p style="font-size:12px;color:var(--muted);">Exigence de cartographie des actifs cryptographiques (Cryptography Bill of Materials) et politique de crypto-agilité documentée.</p>
+            </div>
+        </div>
+
+        <div class="section-title">2. Inventaire Détaillé des Actifs Cryptographiques Vulnérables ({total} alertes)</div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:22%;">Fichier / Endpoint</th>
+                    <th style="width:14%;">Source</th>
+                    <th style="width:22%;">Algorithme Détecté</th>
+                    <th style="width:12%;">Risque PQC</th>
+                    <th style="width:30%;">Plan de Remédiation</th>
+                </tr>
+            </thead>
+            <tbody>
+                {"".join(rows_html)}
+            </tbody>
+        </table>
+
+        <div class="cta-box">
+            <div>
+                <div style="font-weight:700;font-size:15px;color:#fff;">🚀 Automatisez la remédiation Post-Quantique avec Shorless SaaS</div>
+                <div style="font-size:12px;color:#D1FAE5;margin-top:4px;">
+                    Lancez <code>shorless . --fix</code> en local ou activez l'agent Auto-PR sur GitHub / GitLab pour corriger vos configurations TLS &amp; IaC automatiquement.
+                </div>
+            </div>
+            <a href="https://shorless.io" target="_blank" style="background:#10B981;color:#06080D;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap;">
+                Essai SaaS Gratuit →
+            </a>
+        </div>
+
+        <div class="footer">
+            Généré par Shorless PQC &amp; CBOM Scanner (Open Source Apache 2.0) • https://shorless.io
+        </div>
+    </div>
+</body>
+</html>"""
+
+    Path(output_path).write_text(html_content, encoding="utf-8")
 
 def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
     """
@@ -547,6 +709,7 @@ def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
 def scan(
     target_dir: str = typer.Argument(".", help="Dossier du projet à scanner"),
     cbom_out: str = typer.Option("cbom.json", "--cbom", help="Fichier de sortie CycloneDX CBOM"),
+    report_html: str = typer.Option(None, "--report-html", help="Génère un rapport d'audit exécutif HTML/PDF (ex: pqc-report.html)"),
     check_tls: str = typer.Option(None, "--check-tls", help="URL ou domaine:port à inspecter en direct (ex: https://shorless.io)"),
     fix: bool = typer.Option(False, "--fix", help="Corrige automatiquement les fichiers IaC (Nginx, Docker, Traefik, K8s, Terraform)"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Simule les corrections --fix sans modifier les fichiers sur le disque"),
@@ -628,6 +791,7 @@ def scan(
     generate_cyclonedx_cbom(all_findings, cbom_out)
     console.print(f"\n📄 [bold]CBOM CycloneDX 1.6 généré avec succès :[/bold] [underline]{cbom_out}[/underline]")
 
+
     # 6b. Exécution de l'Auto-Remédiation (--fix ou --dry-run)
     if fix or dry_run:
         mode_label = "SIMULATION (--dry-run)" if dry_run else "APPLICATION DES CORRECTIFS (--fix)"
@@ -650,6 +814,10 @@ def scan(
         console.print(f"\n[bold red]❌ Pipeline CI bloquée : {critical_count} vulnérabilité(s) critique(s) face au risque quantique.[/bold red]")
         raise typer.Exit(code=1)
 
+    # 7b. Génération du Rapport d'Audit Exécutif HTML/PDF si demandé
+    if report_html:
+        generate_executive_html_report(all_findings, report_html, target_dir)
+        console.print(f"📊 [bold]Rapport Exécutif HTML/PDF généré :[/bold] [underline]{report_html}[/underline]")
 
 if __name__ == "__main__":
     app()

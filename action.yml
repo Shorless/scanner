@@ -15,6 +15,10 @@ inputs:
     description: "Chemin du fichier CBOM CycloneDX 1.6 généré"
     required: false
     default: "cbom.json"
+  report-html:
+    description: "Chemin du rapport d'audit exécutif HTML/PDF (ex: pqc-report.html)"
+    required: false
+    default: "pqc-report.html"
   check-tls:
     description: "URL ou domaine:port à inspecter en direct (ex: https://shorless.io)"
     required: false
@@ -78,6 +82,9 @@ runs:
         if [ "$INPUT_CI" = "true" ]; then
           ARGS+=("--ci")
         fi
+        if [ -n "$INPUT_HTML" ]; then
+          ARGS+=("--report-html" "$INPUT_HTML")
+        fi
         echo "⚡ Exécution : shorless ${ARGS[*]}"
         shorless "${ARGS[@]}"
 
@@ -86,5 +93,7 @@ runs:
       uses: actions/upload-artifact@v4
       with:
         name: cyclonedx-cbom-report
-        path: ${{ inputs.output-cbom }}
+        path: |
+          ${{ inputs.output-cbom }}
+          ${{ inputs.report-html }}
         if-no-files-found: ignore

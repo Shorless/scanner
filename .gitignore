@@ -6,3 +6,4 @@ build/
 *.egg-info/
 __pycache__/
 test_env/cbom_test.json
+test_env/audit_report_test.html

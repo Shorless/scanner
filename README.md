@@ -1,7 +1,7 @@
 # ⚡ Shorless — Post-Quantum (PQC) DevSecOps Scanner & CycloneDX 1.6 CBOM Generator
 
-[![PyPI version](https://img.shields.io/badge/pypi-v0.9.1-10B981.svg)](https://pypi.org/project/shorless/)
-[![GitHub Release](https://img.shields.io/badge/release-v0.9.1-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v0.9.1)
+[![PyPI version](https://img.shields.io/badge/pypi-v0.9.2-10B981.svg)](https://pypi.org/project/shorless/)
+[![GitHub Release](https://img.shields.io/badge/release-v0.9.2-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v0.9.2)
 [![License](https://img.shields.io/badge/license-Apache%202.0-3B82F6.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CycloneDX 1.6](https://img.shields.io/badge/CBOM-CycloneDX%201.6-A855F7.svg)](https://cyclonedx.org/capabilities/cbom/)
 
@@ -12,11 +12,11 @@
 
 ---
 
-## 🆕 Nouveautés de la version v0.9.1 (Documentation CLI Complète, GitHub Action Officielle & Auto-Fix Multi-IaC)
+## 🆕 Nouveautés de la version v0.9.2 (Générateur de Rapport d'Audit Exécutif HTML/PDF (--report-html))
 
-- Documentation complète de toutes les options CLI (--check-tls, --fix, --dry-run, --cbom, --ci)
-- Ajout de la GitHub Action officielle (action.yml) avec upload automatique de l'artefact CBOM
-- Support complet et auto-remédiation IaC pour Nginx, Dockerfile, Traefik, Kubernetes Ingress et Terraform
+- Ajout de l'option --report-html générant un rapport exécutif HTML/PDF autonome avec Score de Maturité PQC (/100)
+- Synthèse de conformité réglementaire ANSSI, NIST FIPS 203/204, NIS 2 et DORA prête pour les RSSI et CTO
+- Mise à jour de la documentation CLI, de la GitHub Action et des tests automatisés
 
 ---
 
@@ -63,7 +63,7 @@ shorless . --check-tls https://api.entreprise.fr --cbom cbom.json --ci
 
 ---
 
-## 🤖 Intégration GitHub Action Officielle (`Shorless/scanner@v0.9.1`)
+## 🤖 Intégration GitHub Action Officielle (`Shorless/scanner@v0.9.2`)
 
 Ajoutez ce workflow dans `.github/workflows/shorless-pqc.yml` pour auditer chaque Pull Request et archiver automatiquement le CBOM CycloneDX 1.6 :
 
@@ -79,7 +79,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Shorless PQC & CBOM Scanner
-        uses: Shorless/scanner@v0.9.1
+        uses: Shorless/scanner@v0.9.2
         with:
           target-dir: "."
           output-cbom: "cbom-cyclonedx.json"
