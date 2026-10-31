@@ -545,7 +545,7 @@ def generate_cyclonedx_cbom(findings: list, output_path: str):
         "version": 1,
         "metadata": {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.5"}]
+            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.6"}]
         },
         "components": []
     }
@@ -910,7 +910,7 @@ def verify_saas_api_key(api_key: str, findings_count: int, critical_count: int, 
         "findings_count": findings_count,
         "critical_count": critical_count,
         "auto_pr": auto_pr,
-        "version": "0.9.5"
+        "version": "0.9.6"
     }).encode("utf-8")
 
     req = Request(
@@ -940,7 +940,7 @@ def create_automated_pull_request(patched_files: list, findings: list, base_bran
     if not patched_files:
         return ""
 
-    branch_name = f"fix/shorless-pqc-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M')}"
+    branch_name = f"fix/shorless-pqc-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
     pr_title = "🔒 fix(pqc): Migration Post-Quantique TLS 1.3 & Hybride ML-KEM (Shorless Auto-PR)"
 
     patched_bullets = "\n".join([f"- `{fpath}` : {desc}" for fpath, desc in patched_files])
@@ -956,28 +956,21 @@ def create_automated_pull_request(patched_files: list, findings: list, base_bran
         "- **Standard d'inventaire :** OWASP CycloneDX 1.6\n"
     )
     try:
-        # Configure l'identité Git locale si elle n'est pas définie (indispensable sur les runners GitHub Actions)
         subprocess.run(["git", "config", "user.name", "Shorless PQC Bot"], check=False, capture_output=True)
         subprocess.run(["git", "config", "user.email", "bot@shorless.io"], check=False, capture_output=True)
-
-        # Vérifie si la branche existe déjà ou la crée
         subprocess.run(["git", "checkout", "-B", branch_name], check=True, capture_output=True, text=True)
         for fpath, _ in patched_files:
-            subprocess.run(["git", "add", fpath], check=True, capture_output=True, text=True)
-        subprocess.run(["git", "commit", "-m", pr_title], check=True, capture_output=True, text=True)
+            subprocess.run(["git", "add", "-f", fpath], check=True, capture_output=True, text=True)
+        # Commit uniquement s'il y a des changements indexés
+        diff_cached = subprocess.run(["git", "diff", "--cached", "--quiet"], check=False)
+        if diff_cached.returncode != 0:
+            subprocess.run(["git", "commit", "-m", pr_title], check=True, capture_output=True, text=True)
         subprocess.run(["git", "push", "-f", "-u", "origin", branch_name], check=True, capture_output=True, text=True)
-    except Exception as e:
-        console.print(f"[yellow]⚠️ Impossible de créer/pousser la branche Git ({branch_name}) : {e}[/yellow]")
+    except subprocess.CalledProcessError as e:
+        err_detail = (e.stderr or e.stdout or str(e)).strip()
+        console.print(f"[yellow]⚠️ Impossible de créer/pousser la branche Git ({branch_name}) : {err_detail}[/yellow]")
         return ""
-    try:
-        subprocess.run(["git", "checkout", "-b", branch_name], check=True, capture_output=True, text=True)
-        for fpath, _ in patched_files:
-            subprocess.run(["git", "add", fpath], check=True, capture_output=True, text=True)
-        subprocess.run(["git", "commit", "-m", pr_title], check=True, capture_output=True, text=True)
-        subprocess.run(["git", "push", "-u", "origin", branch_name], check=True, capture_output=True, text=True)
-    except Exception as e:
-        console.print(f"[yellow]⚠️ Impossible de créer/pousser la branche Git ({branch_name}) : {e}[/yellow]")
-        return ""
+
 
     # 1. Ouverture via GitHub CLI (`gh`) si disponible
     gh_bin = shutil.which("gh")
