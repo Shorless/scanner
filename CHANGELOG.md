@@ -1,5 +1,10 @@
 # Changelog — Shorless PQC & CBOM Scanner
 
+## [v0.9.1] — 2026-10-31 : Documentation CLI Complète, GitHub Action Officielle & Auto-Fix Multi-IaC
+- Documentation complète de toutes les options CLI (--check-tls, --fix, --dry-run, --cbom, --ci)
+- Ajout de la GitHub Action officielle (action.yml) avec upload automatique de l'artefact CBOM
+- Support complet et auto-remédiation IaC pour Nginx, Dockerfile, Traefik, Kubernetes Ingress et Terraform
+
 ## [v0.9.0] — 2026-10-31 : Auto-Remédiation (--fix) & Support Multi-IaC (Traefik, K8s Ingress, Terraform)
 - Ajout du mode d'auto-remédiation --fix et simulation --dry-run pour corriger automatiquement les fichiers IaC
 - Extension du scanner aux configurations Traefik, manifestes Kubernetes Ingress (.yml/.yaml) et fichiers Terraform (.tf)

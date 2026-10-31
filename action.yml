@@ -1,0 +1,90 @@
+name: "Shorless PQC & CycloneDX 1.6 CBOM Scanner"
+author: "Shorless Security"
+description: "Audit Post-Quantique (AST Python, Nginx, Docker, Traefik, K8s, Terraform, TLS Live), CBOM CycloneDX 1.6 & Auto-Fix."
+
+branding:
+  icon: "shield"
+  color: "green"
+
+inputs:
+  target-dir:
+    description: "Chemin du répertoire projet à analyser"
+    required: false
+    default: "."
+  output-cbom:
+    description: "Chemin du fichier CBOM CycloneDX 1.6 généré"
+    required: false
+    default: "cbom.json"
+  check-tls:
+    description: "URL ou domaine:port à inspecter en direct (ex: https://shorless.io)"
+    required: false
+    default: ""
+  fail-on-critical:
+    description: "Bloquer la pipeline CI/CD (exit code 1) si un risque critique face à Shor est détecté ('true' ou 'false')"
+    required: false
+    default: "true"
+  auto-fix:
+    description: "Corriger automatiquement les configurations IaC vulnérables (--fix)"
+    required: false
+    default: "false"
+  dry-run:
+    description: "Simuler les correctifs --fix sans modifier les fichiers (--dry-run)"
+    required: false
+    default: "false"
+  upload-artifact:
+    description: "Téléverser automatiquement le fichier CBOM en tant qu'artefact de build GitHub Actions"
+    required: false
+    default: "true"
+
+outputs:
+  cbom-path:
+    description: "Chemin vers le fichier CBOM CycloneDX 1.6 généré"
+    value: ${{ inputs.output-cbom }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install Shorless PQC Scanner from PyPI
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -U shorless
+
+    - name: Run Shorless PQC & CBOM Audit
+      shell: bash
+      env:
+        INPUT_TARGET: ${{ inputs.target-dir }}
+        INPUT_CBOM: ${{ inputs.output-cbom }}
+        INPUT_TLS: ${{ inputs.check-tls }}
+        INPUT_CI: ${{ inputs.fail-on-critical }}
+        INPUT_FIX: ${{ inputs.auto-fix }}
+        INPUT_DRY: ${{ inputs.dry-run }}
+      run: |
+        ARGS=("$INPUT_TARGET" "--cbom" "$INPUT_CBOM")
+        if [ -n "$INPUT_TLS" ]; then
+          ARGS+=("--check-tls" "$INPUT_TLS")
+        fi
+        if [ "$INPUT_FIX" = "true" ]; then
+          ARGS+=("--fix")
+        fi
+        if [ "$INPUT_DRY" = "true" ]; then
+          ARGS+=("--dry-run")
+        fi
+        if [ "$INPUT_CI" = "true" ]; then
+          ARGS+=("--ci")
+        fi
+        echo "⚡ Exécution : shorless ${ARGS[*]}"
+        shorless "${ARGS[@]}"
+
+    - name: Upload CycloneDX 1.6 CBOM Artifact
+      if: ${{ always() && inputs.upload-artifact == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: cyclonedx-cbom-report
+        path: ${{ inputs.output-cbom }}
+        if-no-files-found: ignore

@@ -109,7 +109,7 @@ def scan_nginx_config(filepath: Path) -> list:
             continue
         if "ssl_protocols" in clean_line:
             has_ssl = True
-            if "TLSv1.3" not in clean_line:
+            if "TLSv1.3" not in clean_line or any(old in clean_line for old in ("TLSv1 ", "TLSv1.0", "TLSv1.1", "TLSv1.2")):
                 findings.append({
                     "file": str(filepath),
                     "line": i,
@@ -428,7 +428,7 @@ def generate_cyclonedx_cbom(findings: list, output_path: str):
         "version": 1,
         "metadata": {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.0"}]
+            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.1"}]
         },
         "components": []
     }
