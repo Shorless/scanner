@@ -428,7 +428,7 @@ def generate_cyclonedx_cbom(findings: list, output_path: str):
         "version": 1,
         "metadata": {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.8.7"}]
+            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.0"}]
         },
         "components": []
     }
@@ -450,12 +450,106 @@ def generate_cyclonedx_cbom(findings: list, output_path: str):
 
     Path(output_path).write_text(json.dumps(cbom, indent=2, ensure_ascii=False), encoding="utf-8")
 
+def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
+    """
+    Corrige automatiquement les configurations IaC (Nginx, Dockerfile, Traefik, K8s, Terraform)
+    pour activer TLS 1.3 et l'échange de clés hybride post-quantique X25519MLKEM768.
+    """
+    patched_files = []
+
+    # 1. Auto-remédiation Nginx (*.conf)
+    for conf_file in target_path.rglob("*.conf"):
+        orig = conf_file.read_text(encoding="utf-8", errors="ignore")
+        updated = orig
+
+        # Forcer TLSv1.3 uniquement
+        updated = re.sub(
+            r"ssl_protocols\s+[^;]*TLSv1\.[012][^;]*;",
+            "ssl_protocols TLSv1.3;",
+            updated
+        )
+        # Remplacer la courbe elliptique classique par la courbe hybride ANSSI/NIST
+        if "ssl_ecdh_curve" in updated and "MLKEM" not in updated.upper():
+            updated = re.sub(
+                r"ssl_ecdh_curve\s+[^;]+;",
+                "ssl_ecdh_curve X25519MLKEM768:X25519:secp384r1;",
+                updated
+            )
+        elif "ssl_protocols" in updated and "ssl_ecdh_curve" not in updated:
+            updated = updated.replace(
+                "ssl_protocols TLSv1.3;",
+                "ssl_protocols TLSv1.3;\n    ssl_ecdh_curve X25519MLKEM768:X25519:secp384r1;"
+            )
+
+        if updated != orig:
+            if not dry_run:
+                conf_file.write_text(updated, encoding="utf-8")
+            patched_files.append((str(conf_file), "Nginx : TLSv1.3 + Courbe hybride X25519MLKEM768"))
+
+    # 2. Auto-remédiation Dockerfile
+    for item in target_path.rglob("*"):
+        if item.is_file() and (
+            item.name == "Dockerfile"
+            or item.name.startswith("Dockerfile.")
+            or item.name.lower().endswith(".dockerfile")
+        ):
+            orig = item.read_text(encoding="utf-8", errors="ignore")
+            updated = orig
+            updated = re.sub(r"-slim-(buster|stretch|bullseye)", "-slim-bookworm", updated)
+            updated = re.sub(r"debian:(buster|stretch|bullseye)", "debian:bookworm", updated)
+            updated = re.sub(r"ubuntu:(18\.04|20\.04)", "ubuntu:24.04", updated)
+            updated = re.sub(r"openssl=1\.1\.[0-9a-zA-Z.-]+", "openssl", updated)
+
+            if updated != orig:
+                if not dry_run:
+                    item.write_text(updated, encoding="utf-8")
+                patched_files.append((str(item), "Dockerfile : Migration OS & OpenSSL 3.x compatible PQC"))
+
+    # 3. Auto-remédiation YAML (Traefik & Kubernetes Ingress)
+    for yaml_file in list(target_path.rglob("*.yml")) + list(target_path.rglob("*.yaml")):
+        if ".github" in yaml_file.parts:
+            continue
+        orig = yaml_file.read_text(encoding="utf-8", errors="ignore")
+        updated = orig
+
+        # Traefik
+        updated = re.sub(r"minVersion:\s*VersionTLS1[012]", "minVersion: VersionTLS13", updated)
+        updated = re.sub(r"-\s*CurveP384", "- X25519MLKEM768\n        - X25519", updated)
+
+        # Kubernetes Ingress
+        updated = re.sub(
+            r'(nginx\.ingress\.kubernetes\.io/ssl-protocols:\s*)"[^"]*TLSv1\.[012][^"]*"',
+            r'\1"TLSv1.3"',
+            updated
+        )
+
+        if updated != orig:
+            if not dry_run:
+                yaml_file.write_text(updated, encoding="utf-8")
+            patched_files.append((str(yaml_file), "YAML IaC (Traefik/K8s) : Activation TLS 1.3 & X25519MLKEM768"))
+
+    # 4. Auto-remédiation Terraform (*.tf)
+    for tf_file in target_path.rglob("*.tf"):
+        orig = tf_file.read_text(encoding="utf-8", errors="ignore")
+        updated = re.sub(
+            r'ssl_policy\s*=\s*"ELBSecurityPolicy-(2016-08|TLS-1-2-[^"]+)"',
+            'ssl_policy = "ELBSecurityPolicy-TLS13-1-2-2021-06"',
+            orig
+        )
+        if updated != orig:
+            if not dry_run:
+                tf_file.write_text(updated, encoding="utf-8")
+            patched_files.append((str(tf_file), "Terraform : Politique Load Balancer migrée vers TLS 1.3"))
+
+    return patched_files
 
 @app.command()
 def scan(
     target_dir: str = typer.Argument(".", help="Dossier du projet à scanner"),
     cbom_out: str = typer.Option("cbom.json", "--cbom", help="Fichier de sortie CycloneDX CBOM"),
     check_tls: str = typer.Option(None, "--check-tls", help="URL ou domaine:port à inspecter en direct (ex: https://shorless.io)"),
+    fix: bool = typer.Option(False, "--fix", help="Corrige automatiquement les fichiers IaC (Nginx, Docker, Traefik, K8s, Terraform)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Simule les corrections --fix sans modifier les fichiers sur le disque"),
     fail_on_critical: bool = typer.Option(False, "--ci", help="Renvoie un code d'erreur (1) pour bloquer la CI/CD")
 ):
     """Lance un audit de vulnérabilité Post-Quantique sur le code, l'infra (Nginx/Docker) et les endpoints TLS."""
@@ -533,6 +627,23 @@ def scan(
     # 6. Export du CBOM CycloneDX 1.6
     generate_cyclonedx_cbom(all_findings, cbom_out)
     console.print(f"\n📄 [bold]CBOM CycloneDX 1.6 généré avec succès :[/bold] [underline]{cbom_out}[/underline]")
+
+    # 6b. Exécution de l'Auto-Remédiation (--fix ou --dry-run)
+    if fix or dry_run:
+        mode_label = "SIMULATION (--dry-run)" if dry_run else "APPLICATION DES CORRECTIFS (--fix)"
+        console.print(f"\n[bold cyan]🛠️  Auto-Remédiation Post-Quantique — {mode_label}[/bold cyan]")
+        patched = apply_auto_remediation(path, dry_run=dry_run)
+        if patched:
+            for fpath, action_desc in patched:
+                prefix = "[yellow][DRY-RUN][/yellow]" if dry_run else "[bold green][CORRIGÉ][/bold green]"
+                console.print(f"  {prefix} [white]{fpath}[/white] → [emerald]{action_desc}[/emerald]")
+            if not dry_run:
+                console.print(
+                    "\n[bold green]✨ Fichiers mis à jour localement ![/bold green] "
+                    "[dim]Astuce SaaS : Automatisez l'ouverture de Pull Requests GitHub/GitLab et les tests MTU sur https://shorless.io[/dim]"
+                )
+        else:
+            console.print("[yellow]ℹ️  Aucun fichier IaC automatiquement corrigeable trouvé (les clés AST dans le code métier nécessitent une refacto manuelle ou l'agent Auto-PR SaaS).[/yellow]")
 
     # 7. Mode bloqueur CI/CD (GitHub Actions / GitLab CI)
     if fail_on_critical and critical_count > 0:

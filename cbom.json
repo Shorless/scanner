@@ -1,15 +1,15 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:7ce8a823-3d76-4b8b-b1df-3a5bb096451c",
+  "serialNumber": "urn:uuid:aabecbd4-6dd6-4993-82c7-ed3361fcc4cf",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-31T10:24:34.698766+00:00",
+    "timestamp": "2026-10-31T10:36:40.860665+00:00",
     "tools": [
       {
         "vendor": "Shorless",
         "name": "shorless-scanner",
-        "version": "0.8.7"
+        "version": "0.9.0"
       }
     ]
   },
