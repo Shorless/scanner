@@ -1,0 +1,21 @@
+name: Test Shorless GitHub Action
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  self-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Shorless Action on test_env
+        uses: Shorless/scanner@main
+        with:
+          target-dir: "./test_env"
+          output-cbom: "cbom-ci.json"
+          dry-run: "true"
+          fail-on-critical: "false"
+          upload-artifact: "true"
