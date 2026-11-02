@@ -2,20 +2,24 @@
 # -*- coding: utf-8 -*-
 """
 ================================================================================
-SHORLESS PQC & CBOM SCANNER (shorless_scanner.py)
+SHORLESS PQC & CBOM SCANNER v0.9.8 (shorless_scanner.py)
 ================================================================================
 Scanner DevSecOps Open Source (Apache 2.0) de préparation Post-Quantique :
-1. Analyse statique AST Python (RSA, ECDSA P-256, SHA-1, MD5).
-2. Inspection des configurations TLS Nginx (.conf) et courbes hybrides ML-KEM.
-3. Inspection des Dockerfiles (Dockerfile, Dockerfile.*, *.dockerfile) et versions OpenSSL.
-4. Inspection en direct des terminaisons TLS distantes (--check-tls https://...).
-5. Génération native de l'inventaire CBOM au standard OWASP CycloneDX 1.6 (cbom.json).
+1. Analyse statique AST Python & Multi-Langages (Java, Go, Node.js, TS, C#).
+2. Inspection Multi-IaC (Nginx, Dockerfile, Traefik, Kubernetes Ingress, Terraform).
+3. Analyse des dépendances SCA Post-Quantique (requirements.txt, package.json, go.mod, pom.xml, Cargo.toml).
+4. Inspection des certificats X.509 & clés statiques (.pem, .crt, .cer, .key).
+5. Gestion des exceptions via .shorlessignore et commentaires inline (shorless: ignore).
+6. Inspection en direct des terminaisons TLS distantes (--check-tls https://...).
+7. Export natif CBOM OWASP CycloneDX 1.6 (--cbom), SARIF 2.1.0 (--sarif) et HTML/PDF (--report-html).
+8. Synchronisation SaaS Multi-Projets (--project), Webhooks Slack/Teams (--webhook-url) & Auto-PR (--auto-pr).
 ================================================================================
 """
 
 import os
 from urllib.request import Request, urlopen
 import ast
+import fnmatch
 import json
 import re
 import shutil
@@ -31,8 +35,10 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
-app = typer.Typer(help="Scanner DevSecOps de préparation Post-Quantique (PQC) & Générateur CBOM CycloneDX 1.6")
+app = typer.Typer(help="Scanner DevSecOps de préparation Post-Quantique (PQC), SCA, SARIF & Générateur CBOM CycloneDX 1.6")
 console = Console()
+
+SCANNER_VERSION = "0.9.8"
 
 # Base de connaissances PQC (Règles NIST FIPS 203/204 & ANSSI)
 PQC_RULES = {
@@ -75,17 +81,111 @@ FILE_TYPE_MAP = {
     ".js": "Node.js (Crypto)",
     ".ts": "TypeScript (Crypto)",
     ".cs": "C# (.NET Crypto)",
+    ".csproj": "SCA C# (.NET NuGet)",
+    ".props": "SCA C# (Directory.Packages)",
+    ".gradle": "SCA Java (Gradle)",
+    ".kts": "SCA Java (Gradle Kotlin)",
     ".conf": "Nginx Config",
-    ".tf": "Terraform IaC",
-    ".yml": "YAML (Traefik / K8s)",
-    ".yaml": "YAML (Traefik / K8s)",
+    ".tf": "Terraform IaC & Modules",
+    ".hcl": "Terraform Lockfile (.hcl)",
+    ".yml": "YAML (Traefik / K8s / Helm)",
+    ".yaml": "YAML (Traefik / K8s / Helm)",
+    ".pem": "Certificat / Clé (PEM)",
+    ".crt": "Certificat X.509 (CRT)",
+    ".cer": "Certificat X.509 (CER)",
+    ".key": "Clé Privée Statique (KEY)",
+}
+
+SCA_MANIFEST_NAMES = {
+    "requirements.txt": "SCA Python (pip)",
+    "pipfile": "SCA Python (Pipfile)",
+    "poetry.lock": "SCA Python (Poetry Lock)",
+    "package.json": "SCA Node.js (npm)",
+    "package-lock.json": "SCA Node.js (npm Lock)",
+    "yarn.lock": "SCA Node.js (Yarn Lock)",
+    "go.mod": "SCA Go (go.mod)",
+    "go.sum": "SCA Go (go.sum)",
+    "pom.xml": "SCA Java (Maven)",
+    "build.gradle": "SCA Java (Gradle)",
+    "build.gradle.kts": "SCA Java (Gradle KTS)",
+    "packages.config": "SCA C# (NuGet Config)",
+    "directory.packages.props": "SCA C# (Central NuGet)",
+    "cargo.toml": "SCA Rust (Cargo)",
+    "cargo.lock": "SCA Rust (Cargo Lock)",
+    "chart.yaml": "IaC Helm Chart (Dépendances K8s)",
+    ".terraform.lock.hcl": "IaC Terraform Provider Lock",
 }
 
 CRYPTO_HEURISTIC_KEYWORDS = (
     "rsa", "ecdsa", "secp", "prime256", "ed25519", "x25519", "mlkem", "kyber",
     "dilithium", "openssl", "ssl_", "tls", "cipher", "crypto", "private_key",
-    "keypair", "sha1", "md5", "cert", "x509", "jwt", "keystore", "pem"
+    "keypair", "sha1", "md5", "cert", "x509", "jwt", "keystore", "pem", "begin "
 )
+
+
+def parse_version_tuple(ver_str: str) -> tuple:
+    """Extrait un tuple d'entiers (major, minor, patch) depuis une chaîne de version."""
+    nums = re.findall(r"\d+", ver_str or "")
+    if not nums:
+        return (0, 0, 0)
+    vals = [int(x) for x in nums[:3]]
+    while len(vals) < 3:
+        vals.append(0)
+    return tuple(vals)
+
+
+def load_shorlessignore(target_path: Path) -> list:
+    """Charge les motifs d'exclusion définis dans .shorlessignore."""
+    ignore_file = target_path / ".shorlessignore"
+    patterns = []
+    if ignore_file.exists():
+        for line in ignore_file.read_text(encoding="utf-8", errors="ignore").splitlines():
+            clean = line.strip()
+            if clean and not clean.startswith("#"):
+                patterns.append(clean)
+    return patterns
+
+
+def is_ignored_path(filepath: Path, root_path: Path, ignore_patterns: list) -> bool:
+    """Vérifie si un fichier correspond à un motif de .shorlessignore."""
+    if not ignore_patterns:
+        return False
+    try:
+        rel = str(filepath.relative_to(root_path)).replace("\\", "/")
+    except ValueError:
+        rel = filepath.name
+    for pat in ignore_patterns:
+        if fnmatch.fnmatch(rel, pat) or fnmatch.fnmatch(filepath.name, pat):
+            return True
+    return False
+
+
+def has_inline_ignore(line_text: str) -> bool:
+    """Vérifie si une ligne possède une directive d'exclusion inline (shorless: ignore / shorless-ignore)."""
+    low = (line_text or "").lower()
+    return ("shorless: ignore" in low) or ("shorless-ignore" in low) or ("shorless:ignore" in low)
+
+
+def detect_project_name(target_path: Path, explicit_project: str = None) -> str:
+    """Détecte automatiquement le nom du projet/dépôt (GitHub, GitLab CI, Bitbucket Pipelines ou Git local)."""
+    if explicit_project and explicit_project.strip():
+        return explicit_project.strip()
+    for env_var in ("GITHUB_REPOSITORY", "CI_PROJECT_PATH", "BITBUCKET_REPO_FULL_NAME"):
+        val = os.environ.get(env_var, "").strip()
+        if val:
+            return val
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(target_path), "config", "--get", "remote.origin.url"],
+            capture_output=True, text=True, timeout=3
+        )
+        m = re.search(r"[:/]([^/]+/[^/.]+)(?:\.git)?$", (proc.stdout or "").strip())
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    resolved = target_path.resolve().name
+    return resolved if resolved and resolved != "." else "local-project"
 
 
 def detect_file_type_and_crypto_prob(filepath: Path) -> tuple[str, int, str]:
@@ -96,13 +196,19 @@ def detect_file_type_and_crypto_prob(filepath: Path) -> tuple[str, int, str]:
     name_lower = filepath.name.lower()
     suffix_lower = filepath.suffix.lower()
 
-    if filepath.name in ("shorless_scanner.py", "pqc_scanner.py", "release_shorless.py", "cron_generate_article.py") or filepath.name.endswith("_test.html") or filepath.name.endswith("_test.json"):
+    if filepath.name in ("shorless_scanner.py", "pqc_scanner.py", "release_shorless.py", "cron_generate_article.py") or filepath.name.endswith("_test.html") or filepath.name.endswith("_test.json") or filepath.name.endswith("_test.sarif"):
         return ("Ignoré / Non supporté", 0, "Faible")
 
     # 1. Identification du type de fichier
-    if name_lower.startswith("dockerfile"):
+    if name_lower in SCA_MANIFEST_NAMES:
+        file_type = SCA_MANIFEST_NAMES[name_lower]
+        base_prob = 75
+    elif name_lower.startswith("dockerfile"):
         file_type = "Dockerfile (Container)"
         base_prob = 50
+    elif suffix_lower in (".pem", ".crt", ".cer", ".key"):
+        file_type = FILE_TYPE_MAP[suffix_lower]
+        base_prob = 95
     elif suffix_lower in (".yml", ".yaml"):
         file_type = "YAML (Traefik / K8s)"
         base_prob = 45
@@ -141,10 +247,12 @@ def detect_file_type_and_crypto_prob(filepath: Path) -> tuple[str, int, str]:
     level = "Élevée" if prob >= 70 else ("Moyenne" if prob >= 40 else "Faible")
     return (file_type, prob, level)
 
+
 class PythonCryptoVisitor(ast.NodeVisitor):
     """Analyse l'arbre syntaxique (AST) du code Python pour détecter les appels cryptographiques."""
-    def __init__(self, filepath: str):
+    def __init__(self, filepath: str, lines: list = None):
         self.filepath = filepath
+        self.lines = lines or []
         self.findings = []
 
     def visit_Call(self, node: ast.Call):
@@ -155,20 +263,24 @@ class PythonCryptoVisitor(ast.NodeVisitor):
             func_name = node.func.id
 
         if func_name in PQC_RULES:
-            rule = PQC_RULES[func_name]
-            self.findings.append({
-                "file": self.filepath,
-                "line": node.lineno,
-                "type": "Code Python (AST)",
-                "detected": func_name,
-                "algo": rule["algo"],
-                "risk": rule["risk"],
-                "remediation": rule["remediation"]
-            })
+            lineno = getattr(node, "lineno", 1)
+            raw_line = self.lines[lineno - 1] if 1 <= lineno <= len(self.lines) else ""
+            if not has_inline_ignore(raw_line):
+                rule = PQC_RULES[func_name]
+                self.findings.append({
+                    "file": self.filepath,
+                    "line": lineno,
+                    "type": "Code Python (AST)",
+                    "detected": func_name,
+                    "algo": rule["algo"],
+                    "risk": rule["risk"],
+                    "remediation": rule["remediation"]
+                })
         self.generic_visit(node)
 
+
 def scan_multilang_source(filepath: Path) -> list:
-    """Scanne les fichiers source Java (.java), Go (.go) et Node.js/TypeScript (.js, .ts) pour détecter les primitives vulnérables."""
+    """Scanne les fichiers source Java (.java), Go (.go), Node.js/TS (.js, .ts) et C# (.cs)."""
     findings = []
     suffix = filepath.suffix.lower()
     content = filepath.read_text(encoding="utf-8", errors="ignore")
@@ -177,6 +289,8 @@ def scan_multilang_source(filepath: Path) -> list:
     for i, line in enumerate(lines, start=1):
         clean = line.strip()
         if not clean or clean.startswith("//") or clean.startswith("/*") or clean.startswith("*"):
+            continue
+        if has_inline_ignore(clean):
             continue
 
         # 1. Règles Java (JCA / BouncyCastle)
@@ -189,7 +303,7 @@ def scan_multilang_source(filepath: Path) -> list:
                     "detected": clean,
                     "algo": "Java KeyPairGenerator RSA/ECC (Vulnérable à Shor)",
                     "risk": "CRITIQUE",
-                    "remediation": "Utiliser BouncyCastle PQC (bcprov-jdk18on) avec ML-KEM (Kyber) ou ML-DSA (Dilithium)."
+                    "remediation": "Utiliser BouncyCastle PQC (bcprov-jdk18on 1.78+) avec ML-KEM (Kyber) ou ML-DSA (Dilithium)."
                 })
             elif "Cipher.getInstance" in clean and "RSA" in clean.upper():
                 findings.append({
@@ -259,6 +373,7 @@ def scan_multilang_source(filepath: Path) -> list:
                     "risk": "ÉLEVÉ",
                     "remediation": "Utiliser crypto.createHash('sha256') ou 'sha3-256'."
                 })
+
         # 4. Règles C# / .NET (System.Security.Cryptography)
         elif suffix == ".cs":
             if any(k in clean for k in ("RSA.Create(", "RSACryptoServiceProvider", "ECDsa.Create(", "ECDiffieHellman.Create(")):
@@ -283,6 +398,258 @@ def scan_multilang_source(filepath: Path) -> list:
                 })
     return findings
 
+
+def scan_sca_dependencies(filepath: Path) -> list:
+    """
+    Scanne les manifestes de dépendances et fichiers d'héritage de tous les langages supportés :
+    - Python : requirements.txt, Pipfile, poetry.lock
+    - Node.js / TS : package.json, package-lock.json, yarn.lock
+    - Go : go.mod, go.sum
+    - Java : pom.xml, build.gradle, build.gradle.kts
+    - C# (.NET) : *.csproj, packages.config, Directory.Packages.props
+    - Rust : Cargo.toml, Cargo.lock
+    - IaC Helm / Terraform : Chart.yaml, .terraform.lock.hcl
+    """
+    findings = []
+    fname = filepath.name.lower()
+    suffix = filepath.suffix.lower()
+    content = filepath.read_text(encoding="utf-8", errors="ignore")
+    lines = content.splitlines()
+
+    # 1. Python (requirements.txt, Pipfile, poetry.lock)
+    if fname in ("requirements.txt", "pipfile", "poetry.lock"):
+        py_sca_rules = {
+            "cryptography": ((42, 0, 0), "CRITIQUE", "Mettre à niveau vers cryptography>=42.0.0 (OpenSSL 3.2+ compatible ML-KEM)."),
+            "pyopenssl": ((24, 0, 0), "ÉLEVÉ", "Mettre à niveau vers pyOpenSSL>=24.0.0 pour supporter OpenSSL 3.2+."),
+            "paramiko": ((3, 4, 0), "ÉLEVÉ", "Mettre à niveau vers paramiko>=3.4.0 et activer les échanges de clés hybrides SSH."),
+            "pycrypto": ((999, 0, 0), "CRITIQUE", "Remplacer pycrypto (abandonné et vulnérable) par cryptography>=42.0.0 ou liboqs-python."),
+            "pycryptodome": ((3, 20, 0), "MOYEN", "Mettre à niveau pycryptodome>=3.20.0 et hybrider les échanges asymétriques avec liboqs."),
+            "rsa": ((999, 0, 0), "CRITIQUE", "Le paquet python-rsa pur repose sur RSA classique vulnérable à Shor. Migrer vers cryptography / liboqs."),
+            "ecdsa": ((999, 0, 0), "CRITIQUE", "Le paquet python-ecdsa pur est vulnérable à Shor (et aux attaques par canal auxiliaire). Migrer vers cryptography / ML-DSA."),
+        }
+        for i, line in enumerate(lines, start=1):
+            clean = line.strip()
+            if not clean or clean.startswith("#") or has_inline_ignore(clean):
+                continue
+            m = re.match(r'^([a-zA-Z0-9_.-]+)\s*(?:==|<=|~=|>=|<|=\s*[\'"])\s*([0-9][0-9a-zA-Z._-]*)', clean)
+            if m:
+                pkg = m.group(1).lower()
+                ver = m.group(2)
+                if pkg in py_sca_rules:
+                    min_ver, risk, rem = py_sca_rules[pkg]
+                    if parse_version_tuple(ver) < min_ver:
+                        findings.append({
+                            "file": str(filepath),
+                            "line": i,
+                            "type": "Dépendance SCA (Python)",
+                            "detected": clean,
+                            "algo": f"Dépendance Python {pkg} ({ver}) incompatible PQC",
+                            "risk": risk,
+                            "remediation": rem
+                        })
+
+    # 2. Node.js / TypeScript (package.json, package-lock.json, yarn.lock)
+    elif fname in ("package.json", "package-lock.json", "yarn.lock"):
+        js_sca_rules = {
+            "crypto-js": ("ÉLEVÉ", "Remplacer crypto-js par l'API native Node.js WebCrypto (OpenSSL 3.2+) ou liboqs-node."),
+            "node-rsa": ("CRITIQUE", "node-rsa implémente uniquement RSA classique (vulnérable à Shor). Migrer vers WebCrypto / ML-KEM."),
+            "jsrsasign": ("ÉLEVÉ", "jsrsasign repose sur RSA/ECDSA classiques. Planifier la migration vers des jetons signés ML-DSA (FIPS 204)."),
+            "elliptic": ("CRITIQUE", "La bibliothèque elliptic (ECDSA/ECDH classiques) est vulnérable à Shor et comporte des CVE critiques."),
+            "rsa-pem": ("CRITIQUE", "Dépendance RSA classique vulnérable à l'algorithme de Shor."),
+            " ssh2": ("MOYEN", "Vérifier que ssh2>=1.15.0 est utilisé avec échange de clés hybride post-quantique."),
+        }
+        for i, line in enumerate(lines, start=1):
+            clean = line.strip()
+            if has_inline_ignore(clean):
+                continue
+            for pkg, (risk, rem) in js_sca_rules.items():
+                p_clean = pkg.strip()
+                if f'"{p_clean}"' in clean or clean.startswith(f"{p_clean}@"):
+                    findings.append({
+                        "file": str(filepath),
+                        "line": i,
+                        "type": "Dépendance SCA (Node.js/TS)",
+                        "detected": clean.rstrip(","),
+                        "algo": f"Package npm '{p_clean}' non résistant au quantique",
+                        "risk": risk,
+                        "remediation": rem
+                    })
+
+    # 3. Go (go.mod, go.sum)
+    elif fname in ("go.mod", "go.sum"):
+        for i, line in enumerate(lines, start=1):
+            clean = line.strip()
+            if not clean or clean.startswith("//") or has_inline_ignore(clean):
+                continue
+            if fname == "go.mod" and clean.startswith("go "):
+                ver_str = clean.split()[1]
+                if parse_version_tuple(ver_str) < (1, 24, 0):
+                    findings.append({
+                        "file": str(filepath),
+                        "line": i,
+                        "type": "Dépendance SCA (Go)",
+                        "detected": clean,
+                        "algo": f"Runtime Go {ver_str} (< 1.24 requis pour crypto/mlkem natif)",
+                        "risk": "MOYEN",
+                        "remediation": "Mettre à niveau vers Go 1.24+ pour bénéficier du support standard crypto/mlkem et TLS X25519MLKEM768."
+                    })
+            if "golang.org/x/crypto" in clean and any(old in clean for old in ("v0.0.", "v0.1.", "v0.2.", "v0.3.", "v0.4.", "v0.5.", "v0.6.", "v0.7.", "v0.8.", "v0.9.", "v0.10.", "v0.11.", "v0.12.", "v0.13.", "v0.14.", "v0.15.", "v0.16.", "v0.17.")):
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Dépendance SCA (Go)",
+                    "detected": clean,
+                    "algo": "Module golang.org/x/crypto obsolète",
+                    "risk": "ÉLEVÉ",
+                    "remediation": "Mettre à niveau golang.org/x/crypto vers >= v0.31.0 ou adopter cloudflare/circl (ML-KEM / ML-DSA)."
+                })
+
+    # 4. Java (pom.xml, build.gradle, build.gradle.kts)
+    elif fname in ("pom.xml", "build.gradle", "build.gradle.kts") or suffix in (".gradle", ".kts"):
+        for i, line in enumerate(lines, start=1):
+            clean = line.strip()
+            if has_inline_ignore(clean):
+                continue
+            if "bcprov-jdk15on" in clean or "bcprov-jdk15to18" in clean or "bcprov-jdk14" in clean:
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Dépendance SCA (Java)",
+                    "detected": clean,
+                    "algo": "BouncyCastle Legacy (sans support NIST FIPS 203/204)",
+                    "risk": "CRITIQUE",
+                    "remediation": "Migrer vers org.bouncycastle:bcprov-jdk18on (v1.78+) supportant ML-KEM et ML-DSA."
+                })
+            elif "bcprov-jdk18on" in clean:
+                m_ver = re.search(r"1\.(\d+)", clean)
+                if m_ver and int(m_ver.group(1)) < 78:
+                    findings.append({
+                        "file": str(filepath),
+                        "line": i,
+                        "type": "Dépendance SCA (Java)",
+                        "detected": clean,
+                        "algo": f"BouncyCastle 1.{m_ver.group(1)} (< 1.78 requis pour FIPS 203/204 final)",
+                        "risk": "ÉLEVÉ",
+                        "remediation": "Mettre à niveau org.bouncycastle:bcprov-jdk18on vers la version 1.78 ou supérieure."
+                    })
+
+    # 5. C# / .NET (*.csproj, packages.config, Directory.Packages.props)
+    elif suffix in (".csproj", ".props") or fname == "packages.config":
+        for i, line in enumerate(lines, start=1):
+            clean = line.strip()
+            if not clean or has_inline_ignore(clean):
+                continue
+            low = clean.lower()
+            if "<targetframework>" in low or "<targetframeworks>" in low:
+                if any(old_tf in low for old_tf in ("netcoreapp", "netstandard", "net4", "net5.0", "net6.0", "net7.0", "net8.0")):
+                    findings.append({
+                        "file": str(filepath),
+                        "line": i,
+                        "type": "Héritage Runtime (.NET)",
+                        "detected": clean,
+                        "algo": "Framework .NET < 9.0 (Sans support natif MLKem / MLDsa)",
+                        "risk": "MOYEN",
+                        "remediation": "Migrer vers <TargetFramework>net9.0</TargetFramework> (System.Security.Cryptography.MLKem) ou ajouter BouncyCastle.Cryptography >= 2.4.0."
+                    })
+            if 'include="bouncycastle"' in low or 'id="bouncycastle"' in low or "portable.bouncycastle" in low:
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Dépendance SCA (NuGet C#)",
+                    "detected": clean,
+                    "algo": "Package NuGet BouncyCastle Legacy (Obsolète & sans PQC)",
+                    "risk": "CRITIQUE",
+                    "remediation": "Remplacer par le package officiel 'BouncyCastle.Cryptography' (version >= 2.4.0) supportant ML-KEM et ML-DSA."
+                })
+            elif "bouncycastle.cryptography" in low:
+                m_ver = re.search(r'version\s*=\s*"([0-9.]+)"', low)
+                if m_ver and parse_version_tuple(m_ver.group(1)) < (2, 4, 0):
+                    findings.append({
+                        "file": str(filepath),
+                        "line": i,
+                        "type": "Dépendance SCA (NuGet C#)",
+                        "detected": clean,
+                        "algo": f"BouncyCastle.Cryptography {m_ver.group(1)} (< 2.4.0 requis pour FIPS 203)",
+                        "risk": "ÉLEVÉ",
+                        "remediation": "Mettre à niveau BouncyCastle.Cryptography vers >= 2.4.0."
+                    })
+
+    # 6. Rust (Cargo.toml, Cargo.lock)
+    elif fname in ("cargo.toml", "cargo.lock"):
+        for i, line in enumerate(lines, start=1):
+            clean = line.strip()
+            if not clean or clean.startswith("#") or has_inline_ignore(clean):
+                continue
+            if re.match(r"^(rsa|ecdsa|p256|sha1|md-5)\s*=", clean):
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Dépendance SCA (Cargo)",
+                    "detected": clean,
+                    "algo": "Crate Rust asymétrique/hachage classique",
+                    "risk": "ÉLEVÉ",
+                    "remediation": "Adopter les crates post-quantiques pqcrypto-mlkem / pqcrypto-mldsa ou rustls (0.23+) avec X25519MLKEM768."
+                })
+
+    # 7. Dépendances IaC Helm (Chart.yaml) & Providers Terraform (.terraform.lock.hcl)
+    elif fname == "chart.yaml":
+        for i, line in enumerate(lines, start=1):
+            clean = line.strip()
+            if not clean or clean.startswith("#") or has_inline_ignore(clean):
+                continue
+            if "version:" in clean.lower() and any(k in content.lower() for k in ("ingress-nginx", "traefik", "cert-manager")):
+                ver_m = re.search(r"([0-9]+\.[0-9]+\.[0-9]+)", clean)
+                if ver_m and parse_version_tuple(ver_m.group(1)) < (1, 10, 0):
+                    findings.append({
+                        "file": str(filepath),
+                        "line": i,
+                        "type": "Dépendance IaC (Helm Chart)",
+                        "detected": clean,
+                        "algo": f"Sous-Chart Helm Ingress/TLS ({ver_m.group(1)}) sans support OpenSSL 3.2+ PQC",
+                        "risk": "MOYEN",
+                        "remediation": "Mettre à jour la dépendance dans Chart.yaml vers une version récente embarquant OpenSSL 3.2+ et X25519MLKEM768."
+                    })
+
+    return findings
+
+
+def scan_static_cert_or_key(filepath: Path) -> list:
+    """
+    Scanne les fichiers de certificats X.509 et clés statiques (.pem, .crt, .cer, .key)
+    pour identifier les clés RSA/ECDSA embarquées et les signatures faibles.
+    """
+    findings = []
+    content = filepath.read_text(encoding="utf-8", errors="ignore")
+    lines = content.splitlines()
+
+    for i, line in enumerate(lines, start=1):
+        clean = line.strip()
+        if has_inline_ignore(clean):
+            continue
+        if "-----BEGIN RSA PRIVATE KEY-----" in clean or "-----BEGIN EC PRIVATE KEY-----" in clean or "-----BEGIN PRIVATE KEY-----" in clean or "-----BEGIN OPENSSH PRIVATE KEY-----" in clean:
+            findings.append({
+                "file": str(filepath),
+                "line": i,
+                "type": "Clé Statique (PKI)",
+                "detected": clean,
+                "algo": "Clé Privée Asymétrique Statique sur le disque (RSA/ECC)",
+                "risk": "CRITIQUE",
+                "remediation": "Révoquer la clé statique versionnée, utiliser un coffre-fort (Vault/KMS) et planifier l'hybridation PQC (ML-KEM / ML-DSA)."
+            })
+        elif "-----BEGIN CERTIFICATE-----" in clean:
+            findings.append({
+                "file": str(filepath),
+                "line": i,
+                "type": "Certificat X.509 (PKI)",
+                "detected": clean,
+                "algo": "Certificat X.509 Classique (RSA/ECDSA)",
+                "risk": "MOYEN",
+                "remediation": "Inventorié dans le CBOM. Vérifier la date d'expiration et préparer la migration vers des certificats hybrides ou ML-DSA (FIPS 204)."
+            })
+
+    return findings
+
+
 def scan_nginx_config(filepath: Path) -> list:
     """Scanne les fichiers de configuration Nginx pour vérifier la présence de TLS hybride PQC."""
     findings = []
@@ -294,7 +661,7 @@ def scan_nginx_config(filepath: Path) -> list:
 
     for i, line in enumerate(lines, start=1):
         clean_line = line.strip()
-        if clean_line.startswith("#"):
+        if clean_line.startswith("#") or has_inline_ignore(clean_line):
             continue
         if "ssl_protocols" in clean_line:
             has_ssl = True
@@ -326,34 +693,60 @@ def scan_nginx_config(filepath: Path) -> list:
 
 
 def scan_dockerfile(filepath: Path) -> list:
-    """Scanne les Dockerfiles pour détecter les images ou versions d'OpenSSL incompatibles avec la PQC."""
+    """
+    Scanne les Dockerfiles avec résolution d'héritage Multi-Stage (FROM ... AS stage -> FROM stage)
+    et détection des images OS ou runtimes langages embarquant OpenSSL < 3.2.
+    """
     findings = []
     content = filepath.read_text(encoding="utf-8", errors="ignore")
     lines = content.splitlines()
 
     legacy_base_patterns = (
         "buster", "stretch", "bullseye", "ubuntu:18.04", "ubuntu:20.04",
-        "alpine:3.12", "alpine:3.13", "alpine:3.14", "alpine:3.15", "alpine:3.16", "alpine:3.17", "alpine:3.18"
+        "alpine:3.12", "alpine:3.13", "alpine:3.14", "alpine:3.15", "alpine:3.16", "alpine:3.17", "alpine:3.18",
+        "node:14", "node:16", "node:18", "python:3.7", "python:3.8", "golang:1.18", "golang:1.19", "golang:1.20",
+        "aspnet:6.0", "aspnet:7.0", "sdk:6.0", "sdk:7.0"
     )
+
+    vulnerable_stages = {}
 
     for i, line in enumerate(lines, start=1):
         clean_line = line.strip()
-        if not clean_line or clean_line.startswith("#"):
+        if not clean_line or clean_line.startswith("#") or has_inline_ignore(clean_line):
             continue
 
         lower_line = clean_line.lower()
 
-        # 1. Vérification de l'image de base (FROM)
+        # 1. Vérification de l'image de base (FROM) et suivi de l'héritage Multi-Stage (AS <stage>)
         if lower_line.startswith("from "):
-            if any(pat in lower_line for pat in legacy_base_patterns):
+            m_from = re.match(r"^from\s+(?:--platform=[^\s]+\s+)?([^\s]+)(?:\s+as\s+([^\s]+))?", lower_line)
+            base_img = m_from.group(1) if m_from else lower_line
+            stage_alias = m_from.group(2) if (m_from and m_from.group(2)) else None
+
+            if any(pat in base_img for pat in legacy_base_patterns):
+                if stage_alias:
+                    vulnerable_stages[stage_alias] = base_img
                 findings.append({
                     "file": str(filepath),
                     "line": i,
                     "type": "Conteneur (Docker)",
                     "detected": clean_line,
-                    "algo": "Image OS Legacy (OpenSSL < 3.2)",
+                    "algo": f"Image de base Legacy ({base_img} — OpenSSL < 3.2)",
                     "risk": "ÉLEVÉ",
-                    "remediation": "Migrer vers une image de base récente (ex: debian:trixie, ubuntu:24.04, alpine:3.20+) embarquant OpenSSL 3.2+."
+                    "remediation": "Migrer vers une image de base récente (ex: bookworm/trixie, ubuntu:24.04, alpine:3.20+, node:22, dotnet:9.0) embarquant OpenSSL 3.2+."
+                })
+            elif base_img in vulnerable_stages:
+                parent_img = vulnerable_stages[base_img]
+                if stage_alias:
+                    vulnerable_stages[stage_alias] = parent_img
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Héritage Docker (Multi-Stage)",
+                    "detected": clean_line,
+                    "algo": f"Stage Docker héritant d'un parent non-PQC ('{base_img}' issu de '{parent_img}')",
+                    "risk": "MOYEN",
+                    "remediation": f"Mettre à niveau le stage parent '{base_img}' ({parent_img}) vers une image compatible OpenSSL 3.2+."
                 })
 
         # 2. Vérification d'installation explicite d'OpenSSL obsolète (1.1.x, 1.0.x, 3.0.x)
@@ -480,6 +873,7 @@ def scan_live_tls_endpoint(target_url: str) -> list:
 
     return findings
 
+
 def scan_yaml_iac(filepath: Path) -> list:
     """Scanne les fichiers YAML (Traefik & Kubernetes Ingress) pour vérifier TLS 1.3 et l'hybridation PQC."""
     findings = []
@@ -487,7 +881,6 @@ def scan_yaml_iac(filepath: Path) -> list:
     lines = content.splitlines()
     lower_content = content.lower()
 
-    # 1. Détection Kubernetes Ingress & Cert-Manager
     is_k8s_ingress = ("kind: ingress" in lower_content) or ("networking.k8s.io" in lower_content)
     is_cert_manager = ("kind: certificate" in lower_content) and ("cert-manager.io" in lower_content)
 
@@ -495,7 +888,7 @@ def scan_yaml_iac(filepath: Path) -> list:
         has_pqc_curve = any(k in lower_content for k in ("mlkem", "kyber", "x25519mlkem768"))
         for i, line in enumerate(lines, start=1):
             clean = line.strip()
-            if clean.startswith("#"):
+            if clean.startswith("#") or has_inline_ignore(clean):
                 continue
             if "ssl-protocols" in clean.lower() and "tlsv1.3" not in clean.lower():
                 findings.append({
@@ -521,6 +914,8 @@ def scan_yaml_iac(filepath: Path) -> list:
     if is_cert_manager:
         for i, line in enumerate(lines, start=1):
             clean = line.strip()
+            if has_inline_ignore(clean):
+                continue
             if "algorithm:" in clean.lower() and any(a in clean.upper() for a in ("RSA", "ECDSA")):
                 findings.append({
                     "file": str(filepath),
@@ -532,7 +927,6 @@ def scan_yaml_iac(filepath: Path) -> list:
                     "remediation": "Inventorié dans le CBOM. Préparer la migration PKI vers des certificats hybrides ou ML-DSA (FIPS 204)."
                 })
 
-    # 2. Détection Traefik (tls.options, curvePreferences, minVersion)
     is_traefik = ("tls:" in lower_content) and (
         "options:" in lower_content or "curvepreferences" in lower_content or "minversion" in lower_content or "entrypoints" in lower_content
     )
@@ -540,9 +934,9 @@ def scan_yaml_iac(filepath: Path) -> list:
         has_traefik_pqc = any(k in lower_content for k in ("mlkem", "kyber", "x25519mlkem768"))
         for i, line in enumerate(lines, start=1):
             clean = line.strip()
-            if clean.startswith("#"):
+            if clean.startswith("#") or has_inline_ignore(clean):
                 continue
-            if "minversion" in clean.lower() and " versiontls13" not in clean.lower() and "tlsv1.3" not in clean.lower() and "versiontls13" not in clean.lower():
+            if "minversion" in clean.lower() and "versiontls13" not in clean.lower() and "tlsv1.3" not in clean.lower():
                 findings.append({
                     "file": str(filepath),
                     "line": i,
@@ -567,18 +961,23 @@ def scan_yaml_iac(filepath: Path) -> list:
 
 
 def scan_terraform_file(filepath: Path) -> list:
-    """Scanne les fichiers Terraform (.tf) pour détecter les clés RSA/ECDSA et politiques TLS obsolètes."""
+    """
+    Scanne les fichiers Terraform (.tf) pour détecter :
+    1. Les ressources tls_private_key / KMS asymétriques RSA/ECDSA.
+    2. Les politiques Load Balancer / CDN < TLS 1.3.
+    3. Les appels de modules Terraform (module "..." { source = "..." }) liés à ALB/ELB/CloudFront/TLS/Ingress
+       qui héritent d'une politique TLS 1.2 par défaut sans surcharger ssl_policy en TLS 1.3.
+    """
     findings = []
     content = filepath.read_text(encoding="utf-8", errors="ignore")
     lines = content.splitlines()
 
     for i, line in enumerate(lines, start=1):
         clean = line.strip()
-        if not clean or clean.startswith("#") or clean.startswith("//"):
+        if not clean or clean.startswith("#") or clean.startswith("//") or has_inline_ignore(clean):
             continue
         low = clean.lower()
 
-        # 1. Ressource tls_private_key ou clés KMS asymétriques RSA / ECDSA
         if "algorithm" in low and "=" in low and any(alg in clean.upper() for alg in ('"RSA"', '"ECDSA"', '"ED25519"')):
             findings.append({
                 "file": str(filepath),
@@ -590,7 +989,6 @@ def scan_terraform_file(filepath: Path) -> list:
                 "remediation": "Remplacer les clés statiques RSA/ECDSA par des mécanismes d'encapsulation hybrides (ML-KEM) ou signatures ML-DSA."
             })
 
-        # 2. Politiques TLS AWS ALB / CloudFront / GCP / Azure < TLS 1.3
         if ("ssl_policy" in low or "security_policy" in low or "minimum_protocol_version" in low) and (
             any(old_tls in clean.upper() for old_tls in ("TLS-1-0", "TLS-1-1", "TLS-1-2", "TLS1_0", "TLS1_1", "TLS1_2", "2016", "2017", "2021"))
             and "1-3" not in clean.upper()
@@ -606,7 +1004,46 @@ def scan_terraform_file(filepath: Path) -> list:
                 "remediation": "Mettre à niveau vers une politique TLS 1.3 supportant l'échange de clés post-quantique (ex: ELBSecurityPolicy-TLS13-1-2-2021-06 ou PQ-TLS)."
             })
 
+    # 3. Analyse des blocs d'héritage `module "<name>" { ... }`
+    for m_mod in re.finditer(r'module\s+"([^"]+)"\s*\{([^}]*)\}', content, flags=re.DOTALL):
+        mod_name = m_mod.group(1)
+        mod_body = m_mod.group(2)
+        mod_line = content[:m_mod.start()].count("\n") + 1
+        first_line = content.splitlines()[mod_line - 1] if mod_line <= len(lines) else ""
+        if has_inline_ignore(first_line):
+            continue
+
+        body_low = mod_body.lower()
+        is_net_or_crypto_mod = any(
+            k in body_low or k in mod_name.lower()
+            for k in ("alb", "elb", "load-balancer", "cloudfront", "cdn", "ingress", "acm", "kms", "tls", "gateway")
+        )
+        if is_net_or_crypto_mod:
+            has_tls13_override = ("tls13" in body_low or "tls-1-3" in body_low or "tls_1_3" in body_low or "tlsv1.3" in body_low)
+            if not has_tls13_override:
+                src_match = re.search(r'source\s*=\s*"([^"]+)"', mod_body)
+                src_label = src_match.group(1) if src_match else mod_name
+                findings.append({
+                    "file": str(filepath),
+                    "line": mod_line,
+                    "type": "Module IaC (Terraform)",
+                    "detected": f'module "{mod_name}" (source: {src_label})',
+                    "algo": f"Module Terraform '{mod_name}' héritant d'une politique TLS par défaut (< TLS 1.3)",
+                    "risk": "ÉLEVÉ",
+                    "remediation": "Surcharger explicitement 'ssl_policy = \"ELBSecurityPolicy-TLS13-1-2-2021-06\"' (ou équivalent TLS 1.3 PQC) dans les paramètres du module."
+                })
+
     return findings
+
+
+def compute_pqc_score(total_findings: int, critical_count: int) -> int:
+    """Calcule le Score de Maturité PQC (0 à 100) selon la courbe d'amortissement pondérée Shorless."""
+    if total_findings <= 0:
+        return 100
+    other_count = max(0, total_findings - critical_count)
+    weighted_penalty = (critical_count * 12) + (other_count * 4)
+    return int(round(100 * (100 / (100 + weighted_penalty))))
+
 
 def generate_cyclonedx_cbom(findings: list, output_path: str):
     """Génère un fichier CBOM (Cryptography Bill of Materials) au format standard CycloneDX 1.6."""
@@ -617,7 +1054,7 @@ def generate_cyclonedx_cbom(findings: list, output_path: str):
         "version": 1,
         "metadata": {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.7"}]
+            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": SCANNER_VERSION}]
         },
         "components": []
     }
@@ -639,6 +1076,92 @@ def generate_cyclonedx_cbom(findings: list, output_path: str):
 
     Path(output_path).write_text(json.dumps(cbom, indent=2, ensure_ascii=False), encoding="utf-8")
 
+
+def generate_sarif_report(findings: list, output_path: str):
+    """Génère un rapport au standard OASIS SARIF 2.1.0 pour GitHub Code Scanning & GitLab SAST."""
+    rules_map = {}
+    results = []
+
+    for f in findings:
+        rule_id = "SHORLESS-" + re.sub(r"[^A-Z0-9]+", "-", f["type"].upper()).strip("-")
+        sarif_level = "error" if f["risk"] == "CRITIQUE" else ("warning" if f["risk"] == "ÉLEVÉ" else "note")
+
+        if rule_id not in rules_map:
+            rules_map[rule_id] = {
+                "id": rule_id,
+                "name": f["type"],
+                "shortDescription": {"text": f"Risque Post-Quantique ({f['type']})"},
+                "fullDescription": {"text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."},
+                "help": {"text": f["remediation"]},
+                "properties": {"tags": ["security", "post-quantum", "cryptography", "cbom", "nis2"]}
+            }
+
+        uri = str(f["file"]).replace("\\", "/").lstrip("./")
+        results.append({
+            "ruleId": rule_id,
+            "level": sarif_level,
+            "message": {
+                "text": f"[{f['risk']}] {f['algo']} — Détecté : {f['detected']} | Remédiation : {f['remediation']}"
+            },
+            "locations": [{
+                "physicalLocation": {
+                    "artifactLocation": {"uri": uri},
+                    "region": {"startLine": max(1, int(f.get("line", 1)))}
+                }
+            }]
+        })
+
+    sarif_doc = {
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "0.9.8",
+        "runs": [{
+            "tool": {
+                "driver": {
+                    "name": "Shorless PQC & CBOM Scanner",
+                    "informationUri": "https://shorless.io",
+                    "version": SCANNER_VERSION,
+                    "rules": list(rules_map.values())
+                }
+            },
+            "results": results
+        }]
+    }
+    Path(output_path).write_text(json.dumps(sarif_doc, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def send_webhook_notification(webhook_url: str, project_name: str, score: int, total_findings: int, critical_count: int, pr_url: str = "") -> bool:
+    """Envoie une alerte temps réel vers un Webhook Slack, Microsoft Teams ou Discord."""
+    if not webhook_url or not webhook_url.strip():
+        return False
+    status_emoji = "🟢" if score >= 80 else ("🟠" if score >= 50 else "🔴")
+    summary_text = (
+        f"{status_emoji} *Shorless PQC Audit — Projet `{project_name}`*\n"
+        f"• *Score de Maturité PQC :* `{score}/100`\n"
+        f"• *Alertes détectées :* `{total_findings}` (dont `{critical_count}` critiques face à Shor)\n"
+    )
+    if pr_url:
+        summary_text += f"• *Pull Request Auto-Fix :* {pr_url}\n"
+    summary_text += "• *Console Cloud CBOM :* https://shorless.io/dashboard.html"
+
+    # Format universel compatible Slack ("text"), Discord ("content") et Teams
+    payload = json.dumps({
+        "text": summary_text,
+        "content": summary_text
+    }).encode("utf-8")
+
+    req = Request(
+        webhook_url.strip(),
+        data=payload,
+        headers={"Content-Type": "application/json", "User-Agent": f"Shorless-Webhook/{SCANNER_VERSION}"},
+        method="POST"
+    )
+    try:
+        with urlopen(req, timeout=6) as resp:
+            return 200 <= resp.status < 300
+    except Exception:
+        return False
+
+
 def generate_executive_html_report(findings: list, output_path: str, target_dir: str):
     """Génère un rapport d'audit exécutif HTML/PDF autonome pour RSSI, CTO et auditeurs NIS 2 / DORA."""
     now_str = datetime.now(timezone.utc).strftime("%d/%m/%Y à %H:%M UTC")
@@ -647,9 +1170,7 @@ def generate_executive_html_report(findings: list, output_path: str, target_dir:
     high_count = sum(1 for f in findings if f["risk"] == "ÉLEVÉ")
     med_count = sum(1 for f in findings if f["risk"] == "MOYEN")
 
-    # Calcul du Score de Maturité Post-Quantique (0 à 100)
-    penalty = (crit_count * 18) + (high_count * 10) + (med_count * 5)
-    score = max(0, 100 - penalty)
+    score = compute_pqc_score(total, crit_count)
 
     if score >= 80:
         grade, badge_color, status_text = "A — Prêt pour l'ère Post-Quantique", "#10B981", "CONFORME"
@@ -732,9 +1253,9 @@ def generate_executive_html_report(findings: list, output_path: str, target_dir:
                 <div style="font-size:12px;color:var(--muted);margin-top:4px;">Clés RSA/ECC &amp; TLS &lt; 1.3</div>
             </div>
             <div class="card">
-                <div class="card-title">Risques Élevés (Grover / OS)</div>
+                <div class="card-title">Risques Élevés (Grover / SCA)</div>
                 <div class="score-val" style="color:#F59E0B;">{high_count}</div>
-                <div style="font-size:12px;color:var(--muted);margin-top:4px;">SHA-1, MD5, Images Legacy</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:4px;">SHA-1, MD5, Libs Legacy</div>
             </div>
             <div class="card">
                 <div class="card-title">Risques Moyens (Non-Hybridé)</div>
@@ -784,7 +1305,7 @@ def generate_executive_html_report(findings: list, output_path: str, target_dir:
             <div>
                 <div style="font-weight:700;font-size:15px;color:#fff;">🚀 Automatisez la remédiation Post-Quantique avec Shorless SaaS</div>
                 <div style="font-size:12px;color:#D1FAE5;margin-top:4px;">
-                    Lancez <code>shorless . --fix</code> en local ou activez l'agent Auto-PR sur GitHub / GitLab pour corriger vos configurations TLS &amp; IaC automatiquement.
+                    Lancez <code>shorless . --fix</code> en local ou activez l'agent Auto-PR sur GitHub / GitLab pour corriger vos configurations TLS, dépendances SCA &amp; IaC automatiquement.
                 </div>
             </div>
             <a href="https://shorless.io" target="_blank" style="background:#10B981;color:#06080D;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap;">
@@ -793,7 +1314,7 @@ def generate_executive_html_report(findings: list, output_path: str, target_dir:
         </div>
 
         <div class="footer">
-            Généré par Shorless PQC &amp; CBOM Scanner (Open Source Apache 2.0) • https://shorless.io
+            Généré par Shorless PQC &amp; CBOM Scanner v{SCANNER_VERSION} (Open Source Apache 2.0) • https://shorless.io
         </div>
     </div>
 </body>
@@ -801,10 +1322,11 @@ def generate_executive_html_report(findings: list, output_path: str, target_dir:
 
     Path(output_path).write_text(html_content, encoding="utf-8")
 
+
 def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
     """
-    Corrige automatiquement les configurations IaC (Nginx, Dockerfile, Traefik, K8s, Terraform)
-    pour activer TLS 1.3 et l'échange de clés hybride post-quantique X25519MLKEM768.
+    Corrige automatiquement les configurations IaC, le code Backend et les manifestes SCA (requirements.txt)
+    pour activer TLS 1.3, X25519MLKEM768 et les versions de bibliothèques compatibles PQC.
     """
     patched_files = []
 
@@ -812,14 +1334,11 @@ def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
     for conf_file in target_path.rglob("*.conf"):
         orig = conf_file.read_text(encoding="utf-8", errors="ignore")
         updated = orig
-
-        # Forcer TLSv1.3 uniquement
         updated = re.sub(
             r"ssl_protocols\s+[^;]*TLSv1\.[012][^;]*;",
             "ssl_protocols TLSv1.3;",
             updated
         )
-        # Remplacer la courbe elliptique classique par la courbe hybride ANSSI/NIST
         if "ssl_ecdh_curve" in updated and "MLKEM" not in updated.upper():
             updated = re.sub(
                 r"ssl_ecdh_curve\s+[^;]+;",
@@ -831,7 +1350,6 @@ def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
                 "ssl_protocols TLSv1.3;",
                 "ssl_protocols TLSv1.3;\n    ssl_ecdh_curve X25519MLKEM768:X25519:secp384r1;"
             )
-
         if updated != orig:
             if not dry_run:
                 conf_file.write_text(updated, encoding="utf-8")
@@ -850,7 +1368,6 @@ def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
             updated = re.sub(r"debian:(buster|stretch|bullseye)", "debian:bookworm", updated)
             updated = re.sub(r"ubuntu:(18\.04|20\.04)", "ubuntu:24.04", updated)
             updated = re.sub(r"openssl=1\.1\.[0-9a-zA-Z.-]+", "openssl", updated)
-
             if updated != orig:
                 if not dry_run:
                     item.write_text(updated, encoding="utf-8")
@@ -862,18 +1379,13 @@ def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
             continue
         orig = yaml_file.read_text(encoding="utf-8", errors="ignore")
         updated = orig
-
-        # Traefik
         updated = re.sub(r"minVersion:\s*VersionTLS1[012]", "minVersion: VersionTLS13", updated)
         updated = re.sub(r"-\s*CurveP384", "- X25519MLKEM768\n        - X25519", updated)
-
-        # Kubernetes Ingress
         updated = re.sub(
             r'(nginx\.ingress\.kubernetes\.io/ssl-protocols:\s*)"[^"]*TLSv1\.[012][^"]*"',
             r'\1"TLSv1.3"',
             updated
         )
-
         if updated != orig:
             if not dry_run:
                 yaml_file.write_text(updated, encoding="utf-8")
@@ -892,7 +1404,43 @@ def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
                 tf_file.write_text(updated, encoding="utf-8")
             patched_files.append((str(tf_file), "Terraform : Politique Load Balancer migrée vers TLS 1.3"))
 
-    # 5. Auto-remédiation Code Source Multi-Langages (.py, .java, .go, .js, .ts, .cs)
+    # 5. Auto-remédiation SCA Multi-Langages (requirements.txt, go.mod, pom.xml, *.csproj)
+    for req_file in target_path.rglob("requirements.txt"):
+        orig = req_file.read_text(encoding="utf-8", errors="ignore")
+        updated = orig
+        updated = re.sub(r"^cryptography\s*(?:==|<=|~=|>=|<)\s*[0-9][0-9a-zA-Z._-]*", "cryptography>=42.0.0", updated, flags=re.MULTILINE)
+        updated = re.sub(r"^pyOpenSSL\s*(?:==|<=|~=|>=|<)\s*[0-9][0-9a-zA-Z._-]*", "pyOpenSSL>=24.0.0", updated, flags=re.MULTILINE | re.IGNORECASE)
+        updated = re.sub(r"^paramiko\s*(?:==|<=|~=|>=|<)\s*[0-9][0-9a-zA-Z._-]*", "paramiko>=3.4.0", updated, flags=re.MULTILINE)
+        if updated != orig:
+            if not dry_run:
+                req_file.write_text(updated, encoding="utf-8")
+            patched_files.append((str(req_file), "SCA Python (requirements.txt) : Mise à niveau cryptography>=42.0.0 / OpenSSL 3.2+"))
+
+    for gomod_file in target_path.rglob("go.mod"):
+        orig = gomod_file.read_text(encoding="utf-8", errors="ignore")
+        updated = re.sub(r"^go\s+1\.(1[0-9]|2[0-3])(\.[0-9]+)?", "go 1.24.0", orig, flags=re.MULTILINE)
+        if updated != orig:
+            if not dry_run:
+                gomod_file.write_text(updated, encoding="utf-8")
+            patched_files.append((str(gomod_file), "SCA Go (go.mod) : Mise à niveau vers Go 1.24.0 (support crypto/mlkem natif)"))
+
+    for pom_file in target_path.rglob("pom.xml"):
+        orig = pom_file.read_text(encoding="utf-8", errors="ignore")
+        updated = orig.replace("bcprov-jdk15on", "bcprov-jdk18on").replace("bcprov-jdk15to18", "bcprov-jdk18on")
+        if updated != orig:
+            if not dry_run:
+                pom_file.write_text(updated, encoding="utf-8")
+            patched_files.append((str(pom_file), "SCA Java (pom.xml) : Migration vers BouncyCastle bcprov-jdk18on (FIPS 203/204)"))
+
+    for csproj_file in target_path.rglob("*.csproj"):
+        orig = csproj_file.read_text(encoding="utf-8", errors="ignore")
+        updated = re.sub(r'Include="BouncyCastle"', 'Include="BouncyCastle.Cryptography"', orig)
+        if updated != orig:
+            if not dry_run:
+                csproj_file.write_text(updated, encoding="utf-8")
+            patched_files.append((str(csproj_file), "SCA C# (.csproj) : Migration vers BouncyCastle.Cryptography PQC"))
+
+    # 6. Auto-remédiation Code Source Multi-Langages (.py, .java, .go, .js, .ts, .cs)
     for py_file in target_path.rglob("*.py"):
         if py_file.name in ("shorless_scanner.py", "pqc_scanner.py", "release_shorless.py", "cron_generate_article.py"):
             continue
@@ -968,8 +1516,9 @@ def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
 
     return patched_files
 
-def verify_saas_api_key(api_key: str, findings_count: int, critical_count: int, auto_pr: bool) -> dict:
-    """Vérifie la validité de la clé d'API SaaS auprès de shorless.io et enregistre la télémétrie."""
+
+def verify_saas_api_key(api_key: str, findings_count: int, critical_count: int, auto_pr: bool, project_name: str = "default") -> dict:
+    """Vérifie la validité de la clé d'API SaaS auprès de shorless.io et enregistre la télémétrie par projet."""
     clean_key = (api_key or "").strip()
     if not re.match(r"^shorless_(trial|pro)_[a-fA-F0-9]{16,32}$", clean_key):
         return {
@@ -979,10 +1528,11 @@ def verify_saas_api_key(api_key: str, findings_count: int, critical_count: int, 
 
     payload = json.dumps({
         "api_key": clean_key,
+        "project": project_name,
         "findings_count": findings_count,
         "critical_count": critical_count,
         "auto_pr": auto_pr,
-        "version": "0.9.7"
+        "version": SCANNER_VERSION
     }).encode("utf-8")
 
     req = Request(
@@ -990,7 +1540,7 @@ def verify_saas_api_key(api_key: str, findings_count: int, critical_count: int, 
         data=payload,
         headers={
             "Content-Type": "application/json",
-            "User-Agent": "Shorless-CLI/0.9.6"
+            "User-Agent": f"Shorless-CLI/{SCANNER_VERSION}"
         },
         method="POST"
     )
@@ -998,7 +1548,6 @@ def verify_saas_api_key(api_key: str, findings_count: int, critical_count: int, 
         with urlopen(req, timeout=6) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except Exception:
-        # Mode tolérant hors-ligne si le runner CI n'a pas accès à Internet
         return {
             "valid": True,
             "plan": "TRIAL (Validation Locale)",
@@ -1013,19 +1562,19 @@ def create_automated_pull_request(patched_files: list, findings: list, base_bran
         return ""
 
     branch_name = f"shorless-pqc-fix-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
-    pr_title = "🔒 fix(pqc): Migration Post-Quantique TLS 1.3 & Hybride ML-KEM (Shorless Auto-PR)"
+    pr_title = "🔒 fix(pqc): Migration Post-Quantique TLS 1.3, SCA & Hybride ML-KEM (Shorless Auto-PR)"
 
     patched_bullets = "\n".join([f"- `{fpath}` : {desc}" for fpath, desc in patched_files])
     pr_body = (
         "## ⚡ Remédiation Automatique Post-Quantique (Shorless SaaS)\n\n"
         "Cette Pull Request a été générée automatiquement par **Shorless PQC Scanner** (`--fix --auto-pr`) "
-        "pour mettre en conformité vos configurations d'infrastructure avec les recommandations **ANSSI** "
+        "pour mettre en conformité votre code, vos dépendances SCA et vos configurations d'infrastructure avec les recommandations **ANSSI** "
         "et **NIST FIPS 203 (`X25519MLKEM768`)**.\n\n"
-        f"### 🛠️ Fichiers IaC corrigés ({len(patched_files)})\n"
+        f"### 🛠️ Fichiers corrigés ({len(patched_files)})\n"
         f"{patched_bullets}\n\n"
         f"### 📊 Résumé de l'audit CBOM CycloneDX 1.6\n"
         f"- **Alertes totales détectées avant patch :** {len(findings)}\n"
-        "- **Standard d'inventaire :** OWASP CycloneDX 1.6\n"
+        "- **Standard d'inventaire :** OWASP CycloneDX 1.6 & OASIS SARIF 2.1.0\n"
     )
     try:
         subprocess.run(["git", "config", "user.name", "Shorless PQC Bot"], check=False, capture_output=True)
@@ -1033,7 +1582,6 @@ def create_automated_pull_request(patched_files: list, findings: list, base_bran
         subprocess.run(["git", "checkout", "-B", branch_name], check=True, capture_output=True, text=True)
         for fpath, _ in patched_files:
             subprocess.run(["git", "add", "-f", fpath], check=True, capture_output=True, text=True)
-        # Commit uniquement s'il y a des changements indexés
         diff_cached = subprocess.run(["git", "diff", "--cached", "--quiet"], check=False)
         if diff_cached.returncode != 0:
             subprocess.run(["git", "commit", "-m", pr_title], check=True, capture_output=True, text=True)
@@ -1043,10 +1591,12 @@ def create_automated_pull_request(patched_files: list, findings: list, base_bran
         console.print(f"[yellow]⚠️ Impossible de créer/pousser la branche Git ({branch_name}) : {err_detail}[/yellow]")
         return ""
 
+    rem = subprocess.run(["git", "config", "--get", "remote.origin.url"], capture_output=True, text=True)
+    remote_url = (rem.stdout or "").strip()
 
-    # 1. Ouverture via GitHub CLI (`gh`) si disponible
+    # 1. Support GitHub (CLI `gh` ou API REST GitHub)
     gh_bin = shutil.which("gh")
-    if gh_bin:
+    if gh_bin and ("github.com" in remote_url or os.environ.get("GITHUB_REPOSITORY")):
         proc = subprocess.run(
             [gh_bin, "pr", "create", "--title", pr_title, "--body", pr_body, "--base", base_branch, "--head", branch_name],
             capture_output=True, text=True
@@ -1054,17 +1604,15 @@ def create_automated_pull_request(patched_files: list, findings: list, base_bran
         if proc.returncode == 0:
             return proc.stdout.strip()
 
-    # 2. Ouverture via l'API REST GitHub si GITHUB_TOKEN est défini
     github_token = os.environ.get("GITHUB_TOKEN", "").strip()
-    repo_slug = os.environ.get("GITHUB_REPOSITORY", "").strip()
-    if not repo_slug:
-        rem = subprocess.run(["git", "config", "--get", "remote.origin.url"], capture_output=True, text=True)
-        m = re.search(r"github\.com[:/]([^/]+/[^/.]+)", rem.stdout or "")
-        if m:
-            repo_slug = m.group(1)
+    gh_slug = os.environ.get("GITHUB_REPOSITORY", "").strip()
+    if not gh_slug:
+        m_gh = re.search(r"github\.com[:/]([^/]+/[^/.]+?)(?:\.git)?$", remote_url)
+        if m_gh:
+            gh_slug = m_gh.group(1)
 
-    if github_token and repo_slug:
-        api_url = f"https://api.github.com/repos/{repo_slug}/pulls"
+    if github_token and gh_slug:
+        api_url = f"https://api.github.com/repos/{gh_slug}/pulls"
         req = Request(
             api_url,
             data=json.dumps({
@@ -1088,17 +1636,97 @@ def create_automated_pull_request(patched_files: list, findings: list, base_bran
         except Exception as e:
             console.print(f"[yellow]⚠️ Branche poussée ({branch_name}), mais erreur API GitHub PR : {e}[/yellow]")
 
-    return f"Branche '{branch_name}' poussée sur origin (ouvrez la PR sur GitHub)."
+    # 2. Support GitLab (CLI `glab` ou API REST GitLab v4)
+    glab_bin = shutil.which("glab")
+    if glab_bin and ("gitlab" in remote_url.lower() or os.environ.get("CI_PROJECT_ID")):
+        proc = subprocess.run(
+            [glab_bin, "mr", "create", "--title", pr_title, "--description", pr_body, "--target-branch", base_branch, "--source-branch", branch_name, "--yes"],
+            capture_output=True, text=True
+        )
+        if proc.returncode == 0:
+            return proc.stdout.strip()
+
+    gitlab_token = (os.environ.get("GITLAB_TOKEN") or os.environ.get("CI_JOB_TOKEN") or "").strip()
+    gitlab_api = os.environ.get("CI_API_V4_URL", "https://gitlab.com/api/v4").rstrip("/")
+    gitlab_proj = os.environ.get("CI_PROJECT_ID", "").strip()
+    if not gitlab_proj:
+        m_gl = re.search(r"gitlab\.[^/:]+[:/](.+?)(?:\.git)?$", remote_url)
+        if m_gl:
+            from urllib.parse import quote
+            gitlab_proj = quote(m_gl.group(1), safe="")
+
+    if gitlab_token and gitlab_proj:
+        gl_url = f"{gitlab_api}/projects/{gitlab_proj}/merge_requests"
+        headers_gl = {"Content-Type": "application/json", "User-Agent": "Shorless-AutoPR"}
+        if os.environ.get("GITLAB_TOKEN"):
+            headers_gl["PRIVATE-TOKEN"] = gitlab_token
+        else:
+            headers_gl["JOB-TOKEN"] = gitlab_token
+        req = Request(
+            gl_url,
+            data=json.dumps({
+                "source_branch": branch_name,
+                "target_branch": base_branch,
+                "title": pr_title,
+                "description": pr_body
+            }).encode("utf-8"),
+            headers=headers_gl,
+            method="POST"
+        )
+        try:
+            with urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return data.get("web_url", branch_name)
+        except Exception as e:
+            console.print(f"[yellow]⚠️ Branche poussée ({branch_name}), mais erreur API GitLab MR : {e}[/yellow]")
+
+    # 3. Support Bitbucket Cloud (API REST 2.0 via BITBUCKET_TOKEN)
+    bb_token = (os.environ.get("BITBUCKET_TOKEN") or os.environ.get("BITBUCKET_STEP_OAUTH_ACCESS_TOKEN") or "").strip()
+    bb_slug = os.environ.get("BITBUCKET_REPO_FULL_NAME", "").strip()
+    if not bb_slug:
+        m_bb = re.search(r"bitbucket\.org[:/]([^/]+/[^/.]+?)(?:\.git)?$", remote_url)
+        if m_bb:
+            bb_slug = m_bb.group(1)
+
+    if bb_token and bb_slug:
+        bb_url = f"https://api.bitbucket.org/2.0/repositories/{bb_slug}/pullrequests"
+        req = Request(
+            bb_url,
+            data=json.dumps({
+                "title": pr_title,
+                "description": pr_body,
+                "source": {"branch": {"name": branch_name}},
+                "destination": {"branch": {"name": base_branch}}
+            }).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {bb_token}",
+                "Content-Type": "application/json",
+                "User-Agent": "Shorless-AutoPR"
+            },
+            method="POST"
+        )
+        try:
+            with urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return data.get("links", {}).get("html", {}).get("href", branch_name)
+        except Exception as e:
+            console.print(f"[yellow]⚠️ Branche poussée ({branch_name}), mais erreur API Bitbucket PR : {e}[/yellow]")
+
+    return f"Branche '{branch_name}' poussée sur origin (ouvrez la PR/MR sur votre forge Git)."
+
 
 @app.command()
 def scan(
     target_dir: str = typer.Argument(".", help="Dossier du projet à scanner"),
-    cbom_out: str = typer.Option("cbom.json", "--cbom", help="Fichier de sortie CycloneDX CBOM"),
+    cbom_out: str = typer.Option("cbom.json", "--cbom", help="Fichier de sortie CycloneDX 1.6 CBOM"),
+    sarif_out: str = typer.Option(None, "--sarif", help="Génère un rapport OASIS SARIF 2.1.0 pour GitHub Code Scanning (ex: shorless.sarif)"),
     report_html: str = typer.Option(None, "--report-html", help="Génère un rapport d'audit exécutif HTML/PDF (ex: pqc-report.html)"),
     check_tls: str = typer.Option(None, "--check-tls", help="URL ou domaine:port à inspecter en direct (ex: https://shorless.io)"),
-    fix: bool = typer.Option(False, "--fix", help="Corrige automatiquement les fichiers IaC (Nginx, Docker, Traefik, K8s, Terraform)"),
+    fix: bool = typer.Option(False, "--fix", help="Corrige automatiquement le code, les dépendances SCA et les fichiers IaC"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Simule les corrections --fix sans modifier les fichiers sur le disque"),
     api_key: str = typer.Option(None, "--api-key", envvar="SHORLESS_API_KEY", help="Clé d'API Shorless SaaS (active la télémétrie et --auto-pr)"),
+    project: str = typer.Option(None, "--project", help="Nom du projet ou dépôt Git pour segmenter la télémétrie dans le Dashboard SaaS"),
+    webhook_url: str = typer.Option(None, "--webhook-url", envvar="SHORLESS_WEBHOOK_URL", help="URL de Webhook Slack / Microsoft Teams / Discord pour recevoir une alerte de score PQC"),
     auto_pr: bool = typer.Option(False, "--auto-pr", help="Crée une branche Git et ouvre automatiquement une Pull Request avec les correctifs --fix (requiert --api-key)"),
     pr_base: str = typer.Option("main", "--pr-base", help="Branche cible pour la Pull Request automatique (--auto-pr)"),
     verbose: bool = typer.Option(
@@ -1108,21 +1736,23 @@ def scan(
     ),
     fail_on_critical: bool = typer.Option(False, "--ci", help="Renvoie un code d'erreur (1) pour bloquer la CI/CD")
 ):
-    """Lance un audit de vulnérabilité Post-Quantique sur le code, l'infra (Nginx/Docker) et les endpoints TLS."""
-    console.print(Panel.fit("[bold cyan]⚡ Shorless PQC-Scanner - Audit DevSecOps Post-Quantique[/bold cyan]"))
+    """Lance un audit Post-Quantique complet (Code 6 langages, 5 IaC, SCA dépendances, Certificats X.509 & TLS Live)."""
+    console.print(Panel.fit(f"[bold cyan]⚡ Shorless PQC-Scanner v{SCANNER_VERSION} — Audit DevSecOps Post-Quantique, SCA & SARIF[/bold cyan]"))
 
     path = Path(target_dir)
     all_findings = []
+    ignore_patterns = load_shorlessignore(path) if path.exists() else []
+    project_name = detect_project_name(path, project)
 
     if path.exists():
         if verbose:
             v_table = Table(
-                title="🔍 Inventaire Détaillé des Fichiers Analysés (--verbose)",
+                title=f"🔍 Inventaire Détaillé des Fichiers Analysés (--verbose) • Projet : {project_name}",
                 show_header=True,
                 header_style="bold cyan"
             )
             v_table.add_column("Fichier", style="white", no_wrap=False)
-            v_table.add_column("Type Détecté", style="emerald" if hasattr(console, "emerald") else "green")
+            v_table.add_column("Type Détecté", style="green")
             v_table.add_column("Probabilité Crypto", justify="right")
             v_table.add_column("Indice d'Exposition", justify="center")
 
@@ -1131,6 +1761,8 @@ def scan(
                 dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "node_modules", ".venv", "venv", "dist", "build")]
                 for fname in sorted(files):
                     fpath = Path(root) / fname
+                    if is_ignored_path(fpath, path, ignore_patterns):
+                        continue
                     ftype, prob, level = detect_file_type_and_crypto_prob(fpath)
                     if ftype != "Ignoré / Non supporté":
                         scanned_files_meta.append((fpath, ftype, prob, level))
@@ -1156,41 +1788,58 @@ def scan(
         for py_file in path.rglob("*.py"):
             if py_file.name in ("shorless_scanner.py", "pqc_scanner.py", "release_shorless.py", "cron_generate_article.py"):
                 continue
+            if is_ignored_path(py_file, path, ignore_patterns):
+                continue
             try:
-                tree = ast.parse(py_file.read_text(encoding="utf-8", errors="ignore"))
-                visitor = PythonCryptoVisitor(str(py_file))
+                raw_text = py_file.read_text(encoding="utf-8", errors="ignore")
+                tree = ast.parse(raw_text)
+                visitor = PythonCryptoVisitor(str(py_file), raw_text.splitlines())
                 visitor.visit(tree)
                 all_findings.extend(visitor.findings)
             except SyntaxError:
                 pass
-        # 1b. Scan des fichiers Multi-Langages Backend (.java, .go, .js, .ts, "*.cs")
+
+        # 1b. Scan des fichiers Multi-Langages Backend (.java, .go, .js, .ts, .cs)
         for ext in ("*.java", "*.go", "*.js", "*.ts", "*.cs"):
             for src_file in path.rglob(ext):
                 if "node_modules" in src_file.parts or "vendor" in src_file.parts or "dist" in src_file.parts:
+                    continue
+                if is_ignored_path(src_file, path, ignore_patterns):
                     continue
                 all_findings.extend(scan_multilang_source(src_file))
 
         # 2. Scan des configurations Nginx (.conf)
         for conf_file in path.rglob("*.conf"):
-            all_findings.extend(scan_nginx_config(conf_file))
+            if not is_ignored_path(conf_file, path, ignore_patterns):
+                all_findings.extend(scan_nginx_config(conf_file))
 
-        # 3. Scan des Dockerfiles (Dockerfile, Dockerfile.*, *.dockerfile)
+        # 3. Scan des Dockerfiles, manifestes SCA et certificats/clés statiques
         for item in path.rglob("*"):
-            if item.is_file() and (
-                item.name == "Dockerfile"
-                or item.name.startswith("Dockerfile.")
-                or item.name.lower().endswith(".dockerfile")
-            ):
+            if not item.is_file() or is_ignored_path(item, path, ignore_patterns):
+                continue
+            if "node_modules" in item.parts or ".git" in item.parts or "dist" in item.parts:
+                continue
+
+            low_name = item.name.lower()
+            low_suffix = item.suffix.lower()
+            if item.name == "Dockerfile" or item.name.startswith("Dockerfile.") or low_name.endswith(".dockerfile"):
                 all_findings.extend(scan_dockerfile(item))
+            elif low_name in SCA_MANIFEST_NAMES or low_suffix in (".csproj", ".props", ".gradle", ".kts"):
+                all_findings.extend(scan_sca_dependencies(item))
+            elif low_suffix in (".pem", ".crt", ".cer", ".key"):
+                all_findings.extend(scan_static_cert_or_key(item))
+
         # 3b. Scan des configurations YAML (Traefik & Kubernetes Ingress)
         for yaml_file in list(path.rglob("*.yml")) + list(path.rglob("*.yaml")):
             if ".github" in yaml_file.parts or yaml_file.name == "action.yml":
                 continue
-            all_findings.extend(scan_yaml_iac(yaml_file))
+            if not is_ignored_path(yaml_file, path, ignore_patterns):
+                all_findings.extend(scan_yaml_iac(yaml_file))
 
         # 3c. Scan des fichiers Terraform (.tf)
         for tf_file in path.rglob("*.tf"):
-            all_findings.extend(scan_terraform_file(tf_file))
+            if not is_ignored_path(tf_file, path, ignore_patterns):
+                all_findings.extend(scan_terraform_file(tf_file))
 
     # 4. Scan TLS en direct si --check-tls est fourni
     if check_tls:
@@ -1199,6 +1848,8 @@ def scan(
     # 5. Affichage des résultats dans le terminal
     if not all_findings:
         console.print("[bold green]✅ Aucune vulnérabilité post-quantique détectée ![/bold green]")
+        if sarif_out:
+            generate_sarif_report([], sarif_out)
         raise typer.Exit(0)
 
     table = Table(title=f"Inventaire Cryptographique & Risques Quantiques ({len(all_findings)} alertes)")
@@ -1223,10 +1874,13 @@ def scan(
 
     console.print(table)
 
-    # 6. Export du CBOM CycloneDX 1.6
+    # 6. Export du CBOM CycloneDX 1.6 et du rapport SARIF 2.1.0
     generate_cyclonedx_cbom(all_findings, cbom_out)
     console.print(f"\n📄 [bold]CBOM CycloneDX 1.6 généré avec succès :[/bold] [underline]{cbom_out}[/underline]")
 
+    if sarif_out:
+        generate_sarif_report(all_findings, sarif_out)
+        console.print(f"🛡️  [bold]Rapport OASIS SARIF 2.1.0 généré (GitHub Code Scanning) :[/bold] [underline]{sarif_out}[/underline]")
 
     # 6a. Vérification de la clé SaaS (--api-key) si fournie ou si --auto-pr est demandé
     if auto_pr and not api_key:
@@ -1236,8 +1890,6 @@ def scan(
             "[bold white]--api-key shorless_trial_...[/bold white]"
         )
         raise typer.Exit(code=1)
-
-
 
     # 6b. Exécution de l'Auto-Remédiation (--fix, --dry-run ou --auto-pr)
     patched = []
@@ -1252,24 +1904,35 @@ def scan(
             if not dry_run:
                 console.print("\n[bold green]✨ Fichiers mis à jour localement ![/bold green]")
         else:
-            console.print("[yellow]ℹ️  Aucun fichier IaC automatiquement corrigeable trouvé.[/yellow]")
+            console.print("[yellow]ℹ️  Aucun fichier automatiquement corrigeable trouvé.[/yellow]")
+
+    remediated_count = len(patched) if (fix or auto_pr) and not dry_run else 0
+    rem_findings = max(0, len(all_findings) - remediated_count)
+    rem_critical = max(0, critical_count - remediated_count)
+    final_score = compute_pqc_score(rem_findings, rem_critical)
 
     # Envoi de la télémétrie SaaS (avec déduction des risques corrigés si --fix est actif sans --dry-run)
     if api_key:
-        remediated_count = len(patched) if (fix or auto_pr) and not dry_run else 0
-        rem_findings = max(0, len(all_findings) - remediated_count)
-        rem_critical = max(0, critical_count - remediated_count)
-        auth_res = verify_saas_api_key(api_key, rem_findings, rem_critical, auto_pr)
+        auth_res = verify_saas_api_key(api_key, rem_findings, rem_critical, auto_pr, project_name=project_name)
         if not auth_res.get("valid"):
             console.print(f"\n[bold red]❌ Erreur d'authentification SaaS : {auth_res.get('message')}[/bold red]")
             raise typer.Exit(code=1)
-        console.print(f"\n[bold green]🔑 {auth_res.get('message')}[/bold green]")
+        console.print(f"\n[bold green]🔑 {auth_res.get('message')} • Projet : {project_name} • Score PQC : {final_score}/100[/bold green]")
 
+    pr_url = ""
     if patched and not dry_run and auto_pr:
         console.print("[cyan]🚀 Création de la branche Git et ouverture de la Pull Request automatique...[/cyan]")
         pr_url = create_automated_pull_request(patched, all_findings, base_branch=pr_base)
         if pr_url:
             console.print(f"[bold green]✅ Pull Request Post-Quantique ouverte :[/bold green] [underline]{pr_url}[/underline]")
+
+    # Notification Webhook Slack / Teams / Discord si configuré
+    if webhook_url:
+        sent = send_webhook_notification(webhook_url, project_name, final_score, rem_findings, rem_critical, pr_url)
+        if sent:
+            console.print("[bold green]🔔 Notification Webhook (Slack / Teams) envoyée avec succès.[/bold green]")
+        else:
+            console.print("[yellow]⚠️ Échec de l'envoi de la notification Webhook.[/yellow]")
 
     # 7. Génération du Rapport d'Audit Exécutif HTML/PDF si demandé
     if report_html:

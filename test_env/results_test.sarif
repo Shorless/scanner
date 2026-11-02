@@ -1,0 +1,843 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "0.9.8",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Shorless PQC & CBOM Scanner",
+          "informationUri": "https://shorless.io",
+          "version": "0.9.8",
+          "rules": [
+            {
+              "id": "SHORLESS-CODE-PYTHON-AST",
+              "name": "Code Python (AST)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Code Python (AST))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Migrer vers une approche hybride (ex: X25519 + ML-KEM-768) ou signatures ML-DSA."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-CODE-JAVA-JCA",
+              "name": "Code Java (JCA)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Code Java (JCA))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Utiliser BouncyCastle PQC (bcprov-jdk18on 1.78+) avec ML-KEM (Kyber) ou ML-DSA (Dilithium)."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-CODE-GO-STDLIB",
+              "name": "Code Go (Stdlib)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Code Go (Stdlib))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Migrer vers crypto/mlkem (Go 1.24+) ou cloudflare/circl pour l'encapsulation hybride X25519MLKEM768."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-CODE-NODE-JS-TS",
+              "name": "Code Node.js / TS",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Code Node.js / TS)"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Migrer vers un binding liboqs / OpenSSL 3.2+ ou WebCrypto supportant ML-KEM (FIPS 203) et ML-DSA (FIPS 204)."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-CODE-C-NET",
+              "name": "Code C# (.NET)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Code C# (.NET))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Migrer vers System.Security.Cryptography.MLKem / MLDsa (.NET 9+) ou BouncyCastle.Cryptography PQC."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-INFRA-NGINX",
+              "name": "Infra (Nginx)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Infra (Nginx))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Activer TLSv1.3 (prérequis obligatoire pour l'échange de clés post-quantique ML-KEM)."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-H-RITAGE-RUNTIME-NET",
+              "name": "Héritage Runtime (.NET)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Héritage Runtime (.NET))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Migrer vers <TargetFramework>net9.0</TargetFramework> (System.Security.Cryptography.MLKem) ou ajouter BouncyCastle.Cryptography >= 2.4.0."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-D-PENDANCE-SCA-NUGET-C",
+              "name": "Dépendance SCA (NuGet C#)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Dépendance SCA (NuGet C#))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Remplacer par le package officiel 'BouncyCastle.Cryptography' (version >= 2.4.0) supportant ML-KEM et ML-DSA."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-CONTENEUR-DOCKER",
+              "name": "Conteneur (Docker)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Conteneur (Docker))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Migrer vers une image de base récente (ex: bookworm/trixie, ubuntu:24.04, alpine:3.20+, node:22, dotnet:9.0) embarquant OpenSSL 3.2+."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-CERTIFICAT-X-509-PKI",
+              "name": "Certificat X.509 (PKI)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Certificat X.509 (PKI))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Inventorié dans le CBOM. Vérifier la date d'expiration et préparer la migration vers des certificats hybrides ou ML-DSA (FIPS 204)."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-D-PENDANCE-SCA-PYTHON",
+              "name": "Dépendance SCA (Python)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Dépendance SCA (Python))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Mettre à niveau vers cryptography>=42.0.0 (OpenSSL 3.2+ compatible ML-KEM)."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-INFRA-TRAEFIK",
+              "name": "Infra (Traefik)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Infra (Traefik))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Définir 'minVersion: VersionTLS13' dans tls.options de Traefik."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-INFRA-K8S-INGRESS",
+              "name": "Infra (K8s Ingress)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Infra (K8s Ingress))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Forcer 'nginx.ingress.kubernetes.io/ssl-protocols: \"TLSv1.3\"'."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-IAC-TERRAFORM",
+              "name": "IaC (Terraform)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (IaC (Terraform))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Remplacer les clés statiques RSA/ECDSA par des mécanismes d'encapsulation hybrides (ML-KEM) ou signatures ML-DSA."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-MODULE-IAC-TERRAFORM",
+              "name": "Module IaC (Terraform)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Module IaC (Terraform))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Surcharger explicitement 'ssl_policy = \"ELBSecurityPolicy-TLS13-1-2-2021-06\"' (ou équivalent TLS 1.3 PQC) dans les paramètres du module."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "SHORLESS-CODE-PYTHON-AST",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] RSA / ECC (Asymétrique) — Détecté : generate_private_key | Remédiation : Migrer vers une approche hybride (ex: X25519 + ML-KEM-768) ou signatures ML-DSA."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/auth_service.py"
+                },
+                "region": {
+                  "startLine": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-CODE-PYTHON-AST",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] ECDSA / ECDH (P-256) — Détecté : SECP256R1 | Remédiation : Utiliser liboqs / OpenSSL 3.2+ avec un provider OQS pour hybrider la courbe."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/auth_service.py"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-CODE-JAVA-JCA",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] Java KeyPairGenerator RSA/ECC (Vulnérable à Shor) — Détecté : KeyPairGenerator kpg = KeyPairGenerator.getInstance(\"RSA\"); | Remédiation : Utiliser BouncyCastle PQC (bcprov-jdk18on 1.78+) avec ML-KEM (Kyber) ou ML-DSA (Dilithium)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/CryptoService.java"
+                },
+                "region": {
+                  "startLine": 4
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-CODE-GO-STDLIB",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] Go crypto/rsa ou crypto/ecdsa (Vulnérable à Shor) — Détecté : func gen() { _, _ = rsa.GenerateKey(rand.Reader, 2048) } | Remédiation : Migrer vers crypto/mlkem (Go 1.24+) ou cloudflare/circl pour l'encapsulation hybride X25519MLKEM768."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/tls_auth.go"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-CODE-NODE-JS-TS",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] Node.js crypto RSA / ECDSA (Vulnérable à Shor) — Détecté : const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }); | Remédiation : Migrer vers un binding liboqs / OpenSSL 3.2+ ou WebCrypto supportant ML-KEM (FIPS 203) et ML-DSA (FIPS 204)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/jwt_signer.js"
+                },
+                "region": {
+                  "startLine": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-CODE-NODE-JS-TS",
+          "level": "warning",
+          "message": {
+            "text": "[ÉLEVÉ] Hachage Node.js SHA-1 / MD5 Obsolète — Détecté : const hash = crypto.createHash('md5').update('token').digest('hex'); | Remédiation : Utiliser crypto.createHash('sha256') ou 'sha3-256'."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/jwt_signer.js"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-CODE-NODE-JS-TS",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] Node.js crypto RSA / ECDSA (Vulnérable à Shor) — Détecté : export const kp = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' }); | Remédiation : Migrer vers un binding liboqs / OpenSSL 3.2+ ou WebCrypto supportant ML-KEM (FIPS 203) et ML-DSA (FIPS 204)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/token_service.ts"
+                },
+                "region": {
+                  "startLine": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-CODE-C-NET",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] .NET RSA / ECDsa Asymétrique Classique (Vulnérable à Shor) — Détecté : using var rsa = RSA.Create(2048); | Remédiation : Migrer vers System.Security.Cryptography.MLKem / MLDsa (.NET 9+) ou BouncyCastle.Cryptography PQC."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/AuthController.cs"
+                },
+                "region": {
+                  "startLine": 4
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-CODE-C-NET",
+          "level": "warning",
+          "message": {
+            "text": "[ÉLEVÉ] Hachage .NET SHA-1 / MD5 Obsolète — Détecté : using var sha1 = SHA1.Create(); | Remédiation : Remplacer par SHA256.Create() ou SHA3_256.Create()."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/AuthController.cs"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-INFRA-NGINX",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] TLS < 1.3 — Détecté : ssl_protocols TLSv1.2 TLSv1.3; | Remédiation : Activer TLSv1.3 (prérequis obligatoire pour l'échange de clés post-quantique ML-KEM)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/nginx.conf"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-INFRA-NGINX",
+          "level": "note",
+          "message": {
+            "text": "[MOYEN] Échange de clés ECDHE classique — Détecté : Absence de courbe hybride PQC | Remédiation : Ajouter 'ssl_ecdh_curve X25519MLKEM768:X25519;' (Supporté dès OpenSSL 3.2+ / Nginx récent)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/nginx.conf"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-H-RITAGE-RUNTIME-NET",
+          "level": "note",
+          "message": {
+            "text": "[MOYEN] Framework .NET < 9.0 (Sans support natif MLKem / MLDsa) — Détecté : <PropertyGroup><TargetFramework>net6.0</TargetFramework></PropertyGroup> | Remédiation : Migrer vers <TargetFramework>net9.0</TargetFramework> (System.Security.Cryptography.MLKem) ou ajouter BouncyCastle.Cryptography >= 2.4.0."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/App.csproj"
+                },
+                "region": {
+                  "startLine": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-D-PENDANCE-SCA-NUGET-C",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] Package NuGet BouncyCastle Legacy (Obsolète & sans PQC) — Détecté : <ItemGroup><PackageReference Include=\"BouncyCastle\" Version=\"1.8.9\" /></ItemGroup> | Remédiation : Remplacer par le package officiel 'BouncyCastle.Cryptography' (version >= 2.4.0) supportant ML-KEM et ML-DSA."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/App.csproj"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-CONTENEUR-DOCKER",
+          "level": "warning",
+          "message": {
+            "text": "[ÉLEVÉ] Image de base Legacy (python:3.9-slim-buster — OpenSSL < 3.2) — Détecté : FROM python:3.9-slim-buster | Remédiation : Migrer vers une image de base récente (ex: bookworm/trixie, ubuntu:24.04, alpine:3.20+, node:22, dotnet:9.0) embarquant OpenSSL 3.2+."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/Dockerfile.prod"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-CONTENEUR-DOCKER",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] OpenSSL Obsolète (Incompatible PQC) — Détecté : RUN apt-get update && apt-get install -y openssl=1.1.1k | Remédiation : Mettre à niveau vers OpenSSL 3.2+ (ou 3.5+) avec oqs-provider pour supporter ML-KEM (FIPS 203) et ML-DSA (FIPS 204)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/Dockerfile.prod"
+                },
+                "region": {
+                  "startLine": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-CONTENEUR-DOCKER",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] Génération de clé RSA/ECC dans l'image — Détecté : RUN openssl genrsa -out server.key 2048 | Remédiation : Ne pas générer de clés asymétriques classiques dans le build Docker ; utiliser des certificats hybrides injectés au runtime."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/Dockerfile.prod"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-CERTIFICAT-X-509-PKI",
+          "level": "note",
+          "message": {
+            "text": "[MOYEN] Certificat X.509 Classique (RSA/ECDSA) — Détecté : -----BEGIN CERTIFICATE----- | Remédiation : Inventorié dans le CBOM. Vérifier la date d'expiration et préparer la migration vers des certificats hybrides ou ML-DSA (FIPS 204)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/legacy_cert.pem"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-D-PENDANCE-SCA-PYTHON",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] Dépendance Python cryptography (39.0.1) incompatible PQC — Détecté : cryptography==39.0.1 | Remédiation : Mettre à niveau vers cryptography>=42.0.0 (OpenSSL 3.2+ compatible ML-KEM)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/requirements.txt"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-D-PENDANCE-SCA-PYTHON",
+          "level": "warning",
+          "message": {
+            "text": "[ÉLEVÉ] Dépendance Python pyopenssl (22.1.0) incompatible PQC — Détecté : pyOpenSSL==22.1.0 | Remédiation : Mettre à niveau vers pyOpenSSL>=24.0.0 pour supporter OpenSSL 3.2+."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/requirements.txt"
+                },
+                "region": {
+                  "startLine": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-INFRA-TRAEFIK",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] Traefik TLS minVersion < 1.3 — Détecté : minVersion: VersionTLS12 | Remédiation : Définir 'minVersion: VersionTLS13' dans tls.options de Traefik."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/traefik.yml"
+                },
+                "region": {
+                  "startLine": 4
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-INFRA-TRAEFIK",
+          "level": "note",
+          "message": {
+            "text": "[MOYEN] Traefik ECDHE Classique — Détecté : Absence de courbe post-quantique dans curvePreferences | Remédiation : Configurer 'curvePreferences: [X25519MLKEM768, X25519]' dans tls.options (Traefik v3.1+)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/traefik.yml"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-INFRA-K8S-INGRESS",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] Annotation Ingress TLS < 1.3 — Détecté : nginx.ingress.kubernetes.io/ssl-protocols: \"TLSv1.2\" | Remédiation : Forcer 'nginx.ingress.kubernetes.io/ssl-protocols: \"TLSv1.3\"'."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/k8s-ingress.yaml"
+                },
+                "region": {
+                  "startLine": 6
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-INFRA-K8S-INGRESS",
+          "level": "note",
+          "message": {
+            "text": "[MOYEN] K8s Ingress ECDHE Classique — Détecté : Terminaison TLS Ingress sans courbe hybride PQC | Remédiation : Ajouter l'annotation 'nginx.ingress.kubernetes.io/server-snippet: ssl_ecdh_curve X25519MLKEM768:X25519;'."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/k8s-ingress.yaml"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-IAC-TERRAFORM",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] Génération de clé Terraform RSA / ECDSA (Vulnérable à Shor) — Détecté : algorithm = \"RSA\" | Remédiation : Remplacer les clés statiques RSA/ECDSA par des mécanismes d'encapsulation hybrides (ML-KEM) ou signatures ML-DSA."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/main.tf"
+                },
+                "region": {
+                  "startLine": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-IAC-TERRAFORM",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] Politique Cloud Load Balancer / CDN < TLS 1.3 — Détecté : ssl_policy = \"ELBSecurityPolicy-2016-08\" | Remédiation : Mettre à niveau vers une politique TLS 1.3 supportant l'échange de clés post-quantique (ex: ELBSecurityPolicy-TLS13-1-2-2021-06 ou PQ-TLS)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/main.tf"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-MODULE-IAC-TERRAFORM",
+          "level": "warning",
+          "message": {
+            "text": "[ÉLEVÉ] Module Terraform 'alb_public' héritant d'une politique TLS par défaut (< TLS 1.3) — Détecté : module \"alb_public\" (source: terraform-aws-modules/alb/aws) | Remédiation : Surcharger explicitement 'ssl_policy = \"ELBSecurityPolicy-TLS13-1-2-2021-06\"' (ou équivalent TLS 1.3 PQC) dans les paramètres du module."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/modules.tf"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

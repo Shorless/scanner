@@ -1,15 +1,15 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:ac03d210-0c64-47b7-94d7-4cb1ac4df30a",
+  "serialNumber": "urn:uuid:349687d4-2fae-4efd-b998-b0359a210df1",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-11-02T08:49:46.057190+00:00",
+    "timestamp": "2026-11-02T10:09:40.180503+00:00",
     "tools": [
       {
         "vendor": "Shorless",
         "name": "shorless-scanner",
-        "version": "0.9.7"
+        "version": "0.9.8"
       }
     ]
   },
@@ -65,7 +65,7 @@
       "cryptoProperties": {
         "assetType": "algorithm",
         "quantumSafe": "false",
-        "remediation": "Utiliser BouncyCastle PQC (bcprov-jdk18on) avec ML-KEM (Kyber) ou ML-DSA (Dilithium)."
+        "remediation": "Utiliser BouncyCastle PQC (bcprov-jdk18on 1.78+) avec ML-KEM (Kyber) ou ML-DSA (Dilithium)."
       }
     },
     {
@@ -215,7 +215,43 @@
     {
       "type": "cryptographic-asset",
       "bom-ref": "crypto-asset-11",
-      "name": "Image OS Legacy (OpenSSL < 3.2)",
+      "name": "Framework .NET < 9.0 (Sans support natif MLKem / MLDsa)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\App.csproj",
+            "line": 2
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Migrer vers <TargetFramework>net9.0</TargetFramework> (System.Security.Cryptography.MLKem) ou ajouter BouncyCastle.Cryptography >= 2.4.0."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-12",
+      "name": "Package NuGet BouncyCastle Legacy (Obsolète & sans PQC)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\App.csproj",
+            "line": 3
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Remplacer par le package officiel 'BouncyCastle.Cryptography' (version >= 2.4.0) supportant ML-KEM et ML-DSA."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-13",
+      "name": "Image de base Legacy (python:3.9-slim-buster — OpenSSL < 3.2)",
       "evidence": {
         "occurrences": [
           {
@@ -227,12 +263,12 @@
       "cryptoProperties": {
         "assetType": "algorithm",
         "quantumSafe": "false",
-        "remediation": "Migrer vers une image de base récente (ex: debian:trixie, ubuntu:24.04, alpine:3.20+) embarquant OpenSSL 3.2+."
+        "remediation": "Migrer vers une image de base récente (ex: bookworm/trixie, ubuntu:24.04, alpine:3.20+, node:22, dotnet:9.0) embarquant OpenSSL 3.2+."
       }
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-12",
+      "bom-ref": "crypto-asset-14",
       "name": "OpenSSL Obsolète (Incompatible PQC)",
       "evidence": {
         "occurrences": [
@@ -250,7 +286,7 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-13",
+      "bom-ref": "crypto-asset-15",
       "name": "Génération de clé RSA/ECC dans l'image",
       "evidence": {
         "occurrences": [
@@ -268,7 +304,61 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-14",
+      "bom-ref": "crypto-asset-16",
+      "name": "Certificat X.509 Classique (RSA/ECDSA)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\legacy_cert.pem",
+            "line": 1
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Inventorié dans le CBOM. Vérifier la date d'expiration et préparer la migration vers des certificats hybrides ou ML-DSA (FIPS 204)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-17",
+      "name": "Dépendance Python cryptography (39.0.1) incompatible PQC",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\requirements.txt",
+            "line": 1
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Mettre à niveau vers cryptography>=42.0.0 (OpenSSL 3.2+ compatible ML-KEM)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-18",
+      "name": "Dépendance Python pyopenssl (22.1.0) incompatible PQC",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\requirements.txt",
+            "line": 2
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Mettre à niveau vers pyOpenSSL>=24.0.0 pour supporter OpenSSL 3.2+."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-19",
       "name": "Traefik TLS minVersion < 1.3",
       "evidence": {
         "occurrences": [
@@ -286,7 +376,7 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-15",
+      "bom-ref": "crypto-asset-20",
       "name": "Traefik ECDHE Classique",
       "evidence": {
         "occurrences": [
@@ -304,7 +394,7 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-16",
+      "bom-ref": "crypto-asset-21",
       "name": "Annotation Ingress TLS < 1.3",
       "evidence": {
         "occurrences": [
@@ -322,7 +412,7 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-17",
+      "bom-ref": "crypto-asset-22",
       "name": "K8s Ingress ECDHE Classique",
       "evidence": {
         "occurrences": [
@@ -340,7 +430,7 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-18",
+      "bom-ref": "crypto-asset-23",
       "name": "Génération de clé Terraform RSA / ECDSA (Vulnérable à Shor)",
       "evidence": {
         "occurrences": [
@@ -358,7 +448,7 @@
     },
     {
       "type": "cryptographic-asset",
-      "bom-ref": "crypto-asset-19",
+      "bom-ref": "crypto-asset-24",
       "name": "Politique Cloud Load Balancer / CDN < TLS 1.3",
       "evidence": {
         "occurrences": [
@@ -372,6 +462,24 @@
         "assetType": "algorithm",
         "quantumSafe": "false",
         "remediation": "Mettre à niveau vers une politique TLS 1.3 supportant l'échange de clés post-quantique (ex: ELBSecurityPolicy-TLS13-1-2-2021-06 ou PQ-TLS)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-25",
+      "name": "Module Terraform 'alb_public' héritant d'une politique TLS par défaut (< TLS 1.3)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\modules.tf",
+            "line": 1
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Surcharger explicitement 'ssl_policy = \"ELBSecurityPolicy-TLS13-1-2-2021-06\"' (ou équivalent TLS 1.3 PQC) dans les paramètres du module."
       }
     }
   ]

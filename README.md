@@ -1,10 +1,11 @@
 # ⚡ Shorless — Post-Quantum (PQC) DevSecOps Scanner, Auto-PR & CycloneDX 1.6 CBOM Generator
 
-[![PyPI version](https://img.shields.io/badge/pypi-v0.9.7-10B981.svg)](https://pypi.org/project/shorless/)
+[![PyPI version](https://img.shields.io/badge/pypi-v0.9.8-10B981.svg)](https://pypi.org/project/shorless/)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Shorless%20PQC%20Action-2088FF.svg?logo=github-actions&logoColor=white)](https://github.com/marketplace/actions/shorless-pqc-cyclonedx-1-6-cbom-scanner)
-[![GitHub Release](https://img.shields.io/badge/release-v0.9.7-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v0.9.7)
+[![GitHub Release](https://img.shields.io/badge/release-v0.9.8-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v0.9.8)
 [![License](https://img.shields.io/badge/license-Apache%202.0-3B82F6.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CycloneDX 1.6](https://img.shields.io/badge/CBOM-CycloneDX%201.6-A855F7.svg)](https://cyclonedx.org/capabilities/cbom/)
+[![PQC Score](https://shorless.io/api_badge.php?project=Shorless/scanner)](https://shorless.io/dashboard.html)
 
 **Shorless** (`shorless`) est un scanner statique multi-langages (**Python AST, Java, Go, Node.js, TypeScript, C# .NET**), d'infrastructure (**Nginx, Dockerfile, Traefik, Kubernetes Ingress, Terraform**), réseau (`--check-tls`) et d'auto-remédiation (`--fix` / `--auto-pr`) conçu pour aider les équipes DevSecOps, RSSI et CTO à cartographier leur dette cryptographique et automatiser leur migration vers la cryptographie post-quantique (**ANSSI** / **NIST FIPS 203 ML-KEM** & **FIPS 204 ML-DSA**).
 
@@ -14,11 +15,12 @@
 
 ---
 
-## 🆕 Nouveautés de la version v0.9.7 (Mode Inventaire Verbeux (--verbose) & Probabilité d'Exposition Crypto)
+## 🆕 Nouveautés de la version v0.9.8 (SCA Tous Langages (.NET/Java/Go/Py/JS), Héritages IaC (Modules Terraform & Docker), SARIF 2.1.0 & Multi-Projets)
 
-- Ajout de l'option CLI --verbose (-v) affichant la liste détaillée des fichiers analysés, leur technologie détectée et la probabilité heuristique (%) de présence cryptographique
-- Ajout de l'input verbose dans la GitHub Action officielle (action.yml) et mise à jour de l'alias @v0
-- Mise à jour complète de la documentation utilisateur (scanner-documentation.html et README.md).
+- Analyse des dépendances SCA pour tous les langages supportés (requirements.txt, Pipfile, package-lock.json, go.mod, pom.xml, build.gradle, *.csproj NuGet, Cargo.toml) et auto-remédiation SCA via --fix
+- Analyse des héritages IaC : modules Terraform (module '...') sans override TLS 1.3, héritage multi-stage Dockerfile (FROM ... AS) et sous-charts Helm (Chart.yaml)
+- Export natif OASIS SARIF 2.1.0 (--sarif), détection des certificats X.509 / clés statiques (.pem, .crt, .key) et gestion des exceptions (.shorlessignore)
+- Compatibilité Multi-Forges (GitHub PR, GitLab Merge Request, Bitbucket PR), suivi Multi-Projets (--project), Webhooks Slack/Teams et badges SVG dynamiques (api_badge.php).
 
 ---
 
@@ -60,6 +62,9 @@ shorless . --check-tls https://api.entreprise.fr --cbom cbom.json --ci
 | :--- | :--- | :--- | :--- |
 | `TARGET_DIR` | Argument | `.` | Dossier projet analysé récursivement (`.py`, `.java`, `.go`, `.js`, `.ts`, `.cs`, `.conf`, `Dockerfile*`, `.yml/.yaml`, `.tf`). |
 | `--cbom TEXT` | Option | `cbom.json` | Chemin du fichier JSON généré au standard officiel **OWASP CycloneDX 1.6**. |
+| `--sarif TEXT` | Option | `None` | Génère un rapport **OASIS SARIF 2.1.0** pour annoter les Pull Requests dans GitHub Code Scanning. |
+| `--project TEXT` | Option | `Auto` | Nom du projet/dépôt Git pour segmenter la télémétrie dans la Console SaaS et générer le badge SVG. |
+| `--webhook-url TEXT` | Option | `None` | URL de Webhook **Slack / Microsoft Teams / Discord** pour recevoir une alerte de score PQC. |
 | `--report-html TEXT` | Option | `None` | Génère un **Rapport d'Audit Exécutif HTML/PDF** autonome (Score PQC /100, NIS 2, DORA, ANSSI) pour RSSI & CTO. |
 | `--check-tls TEXT` | Option | `None` | URL ou `domaine:port` à inspecter en direct (handshake TLS 1.3, groupe hybride `X25519MLKEM768`, certificat X.509). |
 | `--fix` | Flag | `False` | Corrige automatiquement les 11 technologies (6 langages Backend + 5 formats IaC) vers TLS 1.3 & ML-KEM (FIPS 203). |
@@ -73,7 +78,7 @@ shorless . --check-tls https://api.entreprise.fr --cbom cbom.json --ci
 
 ---
 
-## 🤖 Intégration GitHub Action Officielle (`Shorless/scanner@v0` / `@v0.9.7`)
+## 🤖 Intégration GitHub Action Officielle (`Shorless/scanner@v0` / `@v0.9.8`)
 
 Disponible sur le **[GitHub Marketplace](https://github.com/marketplace/actions/shorless-pqc-cyclonedx-1-6-cbom-scanner)**. Ajoutez ce workflow dans `.github/workflows/shorless-pqc.yml` :
 

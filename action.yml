@@ -1,6 +1,6 @@
 name: "Shorless PQC & CycloneDX 1.6 CBOM Scanner"
 author: "Shorless Security"
-description: "Audit Post-Quantique (Python, Java, Go, Node.js, TS, C#, Multi-IaC, TLS Live), Auto-PR SaaS & CBOM CycloneDX 1.6."
+description: "Audit Post-Quantique (6 Langages, 5 IaC, SCA Dépendances, Certificats X.509, TLS Live), Export SARIF, Auto-PR SaaS & CBOM CycloneDX 1.6."
 branding:
   icon: "shield"
   color: "green"
@@ -14,6 +14,10 @@ inputs:
     description: "Chemin du fichier CBOM CycloneDX 1.6 généré (--cbom)"
     required: false
     default: "cbom.json"
+  output-sarif:
+    description: "Chemin du rapport OASIS SARIF 2.1.0 généré pour GitHub Code Scanning (--sarif)"
+    required: false
+    default: ""
   report-html:
     description: "Chemin du rapport d'audit exécutif HTML/PDF généré (--report-html)"
     required: false
@@ -23,7 +27,7 @@ inputs:
     required: false
     default: ""
   auto-fix:
-    description: "Applique automatiquement les correctifs PQC sur les fichiers IaC (--fix)"
+    description: "Applique automatiquement les correctifs PQC sur le code, le SCA et les fichiers IaC (--fix)"
     required: false
     default: "false"
   dry-run:
@@ -34,8 +38,16 @@ inputs:
     description: "Clé d'API Shorless SaaS (--api-key) pour activer la télémétrie et l'ouverture automatique de Pull Requests"
     required: false
     default: ""
+  project:
+    description: "Nom du projet ou dépôt Git pour segmenter la télémétrie dans le Dashboard SaaS (--project)"
+    required: false
+    default: ""
+  webhook-url:
+    description: "URL de Webhook Slack / Microsoft Teams / Discord pour recevoir une alerte de score PQC (--webhook-url)"
+    required: false
+    default: ""
   auto-pr:
-    description: "Crée une branche Git et ouvre automatiquement une Pull Request avec les correctifs IaC (--auto-pr)"
+    description: "Crée une branche Git et ouvre automatiquement une Pull Request avec les correctifs (--auto-pr)"
     required: false
     default: "false"
   pr-base:
@@ -51,7 +63,7 @@ inputs:
     required: false
     default: "true"
   upload-artifact:
-    description: "Téléverse automatiquement le CBOM JSON et le rapport HTML en artefacts GitHub Actions"
+    description: "Téléverse automatiquement le CBOM JSON, le SARIF et le rapport HTML en artefacts GitHub Actions"
     required: false
     default: "true"
 
@@ -73,17 +85,20 @@ runs:
           python -m pip install --upgrade shorless
         fi
 
-    - name: Run Shorless PQC & CBOM Audit
+    - name: Run Shorless PQC, SCA & CBOM Audit
       shell: bash
       env:
         GITHUB_TOKEN: ${{ github.token }}
         INPUT_TARGET: ${{ inputs.target-dir }}
         INPUT_CBOM: ${{ inputs.output-cbom }}
+        INPUT_SARIF: ${{ inputs.output-sarif }}
         INPUT_HTML: ${{ inputs.report-html }}
         INPUT_TLS: ${{ inputs.check-tls }}
         INPUT_FIX: ${{ inputs.auto-fix }}
         INPUT_DRY: ${{ inputs.dry-run }}
         INPUT_API_KEY: ${{ inputs.api-key }}
+        INPUT_PROJECT: ${{ inputs.project }}
+        INPUT_WEBHOOK: ${{ inputs.webhook-url }}
         INPUT_AUTO_PR: ${{ inputs.auto-pr }}
         INPUT_PR_BASE: ${{ inputs.pr-base }}
         INPUT_VERBOSE: ${{ inputs.verbose }}
@@ -91,6 +106,9 @@ runs:
       run: |
         ARGS=("$INPUT_TARGET" "--cbom" "$INPUT_CBOM")
 
+        if [ -n "$INPUT_SARIF" ]; then
+          ARGS+=("--sarif" "$INPUT_SARIF")
+        fi
         if [ -n "$INPUT_HTML" ]; then
           ARGS+=("--report-html" "$INPUT_HTML")
         fi
@@ -106,6 +124,12 @@ runs:
         if [ -n "$INPUT_API_KEY" ]; then
           ARGS+=("--api-key" "$INPUT_API_KEY")
         fi
+        if [ -n "$INPUT_PROJECT" ]; then
+          ARGS+=("--project" "$INPUT_PROJECT")
+        fi
+        if [ -n "$INPUT_WEBHOOK" ]; then
+          ARGS+=("--webhook-url" "$INPUT_WEBHOOK")
+        fi
         if [ "$INPUT_AUTO_PR" = "true" ]; then
           ARGS+=("--auto-pr" "--pr-base" "$INPUT_PR_BASE")
         fi
@@ -118,12 +142,13 @@ runs:
 
         shorless "${ARGS[@]}"
 
-    - name: Upload CycloneDX 1.6 CBOM & Executive HTML Report
+    - name: Upload CycloneDX 1.6 CBOM, SARIF & Executive HTML Report
       if: always() && inputs.upload-artifact == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: cyclonedx-cbom-report
         path: |
           ${{ inputs.output-cbom }}
+          ${{ inputs.output-sarif }}
           ${{ inputs.report-html }}
         if-no-files-found: ignore
