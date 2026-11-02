@@ -1,13 +1,13 @@
 {
   "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-  "version": "0.9.8",
+  "version": "1.0.0",
   "runs": [
     {
       "tool": {
         "driver": {
           "name": "Shorless PQC & CBOM Scanner",
           "informationUri": "https://shorless.io",
-          "version": "0.9.8",
+          "version": "1.0.0",
           "rules": [
             {
               "id": "SHORLESS-CODE-PYTHON-AST",
@@ -217,7 +217,7 @@
                 "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
               },
               "help": {
-                "text": "Inventorié dans le CBOM. Vérifier la date d'expiration et préparer la migration vers des certificats hybrides ou ML-DSA (FIPS 204)."
+                "text": "Inventorié dans le CBOM. Planifier la migration vers des certificats hybrides, ML-DSA (FIPS 204) ou Merkle Tree Certificates (MTC)."
               },
               "properties": {
                 "tags": [
@@ -262,6 +262,28 @@
               },
               "help": {
                 "text": "Définir 'minVersion: VersionTLS13' dans tls.options de Traefik."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "post-quantum",
+                  "cryptography",
+                  "cbom",
+                  "nis2"
+                ]
+              }
+            },
+            {
+              "id": "SHORLESS-INFRA-ENVOY-PROXY",
+              "name": "Infra (Envoy Proxy)",
+              "shortDescription": {
+                "text": "Risque Post-Quantique (Infra (Envoy Proxy))"
+              },
+              "fullDescription": {
+                "text": "Détection d'algorithmes, de dépendances ou de configurations TLS vulnérables à l'algorithme de Shor ou Grover."
+              },
+              "help": {
+                "text": "Forcer 'tls_minimum_protocol_version: TLSv1_3' dans common_tls_context.tls_params."
               },
               "properties": {
                 "tags": [
@@ -651,7 +673,7 @@
           "ruleId": "SHORLESS-CERTIFICAT-X-509-PKI",
           "level": "note",
           "message": {
-            "text": "[MOYEN] Certificat X.509 Classique (RSA/ECDSA) — Détecté : -----BEGIN CERTIFICATE----- | Remédiation : Inventorié dans le CBOM. Vérifier la date d'expiration et préparer la migration vers des certificats hybrides ou ML-DSA (FIPS 204)."
+            "text": "[MOYEN] Certificat X.509 RSA/ECDSA — Détecté : -----BEGIN CERTIFICATE----- (Certificat X.509 actif) | Remédiation : Inventorié dans le CBOM. Planifier la migration vers des certificats hybrides, ML-DSA (FIPS 204) ou Merkle Tree Certificates (MTC)."
           },
           "locations": [
             {
@@ -734,6 +756,44 @@
               "physicalLocation": {
                 "artifactLocation": {
                   "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/traefik.yml"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-INFRA-ENVOY-PROXY",
+          "level": "error",
+          "message": {
+            "text": "[CRITIQUE] Envoy TLS minimum_protocol_version < TLSv1_3 — Détecté : tls_minimum_protocol_version: TLSv1_2 | Remédiation : Forcer 'tls_minimum_protocol_version: TLSv1_3' dans common_tls_context.tls_params."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/envoy.yaml"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "SHORLESS-INFRA-ENVOY-PROXY",
+          "level": "note",
+          "message": {
+            "text": "[MOYEN] Envoy Proxy mTLS / TLS ECDHE Classique — Détecté : DownstreamTlsContext sans groupe hybride dans ecdh_curves | Remédiation : Ajouter 'ecdh_curves: [X25519MLKEM768, X25519]' dans tls_params d'Envoy Proxy."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "C:/Users/mathi/Documents/Projets/shorless/scanner/test_env/envoy.yaml"
                 },
                 "region": {
                   "startLine": 1

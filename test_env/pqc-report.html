@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport d'Audit Exécutif Post-Quantique (CBOM) — Shorless.io</title>
+    <style>
+        :root { --bg: #0B0F17; --card: #111827; --text: #F3F4F6; --muted: #9CA3AF; --accent: #10B981; --border: #1F2937; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); padding: 32px; line-height: 1.5; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 28px; }
+        .brand { font-family: monospace; font-size: 22px; font-weight: 800; color: #fff; }
+        .brand span { color: var(--accent); }
+        .btn-print { background: var(--accent); color: #06080D; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px; }
+        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+        .card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 8px; font-family: monospace; }
+        .score-val { font-size: 36px; font-weight: 800; font-family: monospace; }
+        .section-title { font-size: 18px; font-weight: 700; margin: 28px 0 14px; color: #fff; }
+        table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); font-size: 13px; }
+        th { background: #06080D; color: var(--muted); text-align: left; padding: 12px 14px; font-family: monospace; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+        .mono { font-family: monospace; color: #38BDF8; font-size: 12px; word-break: break-all; }
+        .detected { font-family: monospace; font-size: 11px; color: var(--muted); }
+        .tag { background: #1F2937; color: #E5E7EB; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-family: monospace; }
+        .badge { padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; font-family: monospace; display: inline-block; }
+        .compliance-box { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+        .cta-box { margin-top: 32px; background: linear-gradient(135deg, #064E3B 0%, #0F172A 100%); border: 1px solid #10B98150; border-radius: 12px; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; }
+        .footer { margin-top: 32px; text-align: center; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 16px; font-family: monospace; }
+        @media print {
+            body { background: #fff; color: #111; padding: 0; }
+            .card, table, .cta-box { background: #fff !important; border: 1px solid #ccc !important; color: #111 !important; }
+            th { background: #f3f4f6 !important; color: #111 !important; }
+            .brand, .section-title, strong { color: #000 !important; }
+            .btn-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <div class="brand">⚡ shorless<span>.io</span> — Rapport d'Audit Exécutif PQC &amp; CBOM</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:4px;font-family:monospace;">
+                    Périmètre audité : ./test_env • Généré le 02/11/2026 à 10:28 UTC • Standard OWASP CycloneDX 1.6
+                </div>
+            </div>
+            <button class="btn-print" onclick="window.print()">🖨️ Imprimer / Exporter en PDF</button>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <div class="card-title">Score de Maturité PQC</div>
+                <div class="score-val" style="color:#EF4444;">30/100</div>
+                <div style="font-size:12px;color:#EF4444;font-weight:600;margin-top:4px;">E — Vulnérable à l'Algorithme de Shor</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Risques Critiques (Shor)</div>
+                <div class="score-val" style="color:#EF4444;">16</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:4px;">Clés RSA/ECC &amp; TLS &lt; 1.3</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Risques Élevés (Grover / SCA)</div>
+                <div class="score-val" style="color:#F59E0B;">5</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:4px;">SHA-1, MD5, Libs Legacy</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Risques Moyens (Non-Hybridé)</div>
+                <div class="score-val" style="color:#3B82F6;">5</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:4px;">Absence de KEM X25519MLKEM768</div>
+            </div>
+        </div>
+
+        <div class="section-title">1. État de Conformité Réglementaire &amp; Normative</div>
+        <div class="compliance-box">
+            <div class="card">
+                <div class="card-title">NIST FIPS 203 (ML-KEM) &amp; FIPS 204</div>
+                <div style="font-weight:700;color:#EF4444;margin-bottom:6px;">NON CONFORME (RISQUE CRITIQUE)</div>
+                <p style="font-size:12px;color:var(--muted);">Vérifie l'encapsulation de clés post-quantique hybride et le remplacement des primitives RSA/ECDSA vulnérables à l'algorithme de Shor.</p>
+            </div>
+            <div class="card">
+                <div class="card-title">Recommandations ANSSI (Hybridation)</div>
+                <div style="font-weight:700;color:#EF4444;margin-bottom:6px;">
+                    ACTION REQUISE SUR TLS / ASYMÉTRIQUE
+                </div>
+                <p style="font-size:12px;color:var(--muted);">L'ANSSI recommande l'hybridation systématique associant un algorithme classique (X25519) à un KEM post-quantique (ML-KEM-768) dès 2026.</p>
+            </div>
+            <div class="card">
+                <div class="card-title">Directives UE NIS 2 &amp; DORA (Art. 21)</div>
+                <div style="font-weight:700;color:#10B981;margin-bottom:6px;">INVENTAIRE CBOM GÉNÉRÉ</div>
+                <p style="font-size:12px;color:var(--muted);">Exigence de cartographie des actifs cryptographiques (Cryptography Bill of Materials) et politique de crypto-agilité documentée.</p>
+            </div>
+        </div>
+
+        <div class="section-title">2. Inventaire Détaillé des Actifs Cryptographiques Vulnérables (26 alertes)</div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:22%;">Fichier / Endpoint</th>
+                    <th style="width:14%;">Source</th>
+                    <th style="width:22%;">Algorithme Détecté</th>
+                    <th style="width:12%;">Risque PQC</th>
+                    <th style="width:30%;">Plan de Remédiation</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr>
+            <td class="mono">test_env\auth_service.py:2</td>
+            <td><span class="tag">Code Python (AST)</span></td>
+            <td><strong>RSA / ECC (Asymétrique)</strong><br><span class="detected">generate_private_key</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Migrer vers une approche hybride (ex: X25519 + ML-KEM-768) ou signatures ML-DSA.</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\auth_service.py:3</td>
+            <td><span class="tag">Code Python (AST)</span></td>
+            <td><strong>ECDSA / ECDH (P-256)</strong><br><span class="detected">SECP256R1</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Utiliser liboqs / OpenSSL 3.2+ avec un provider OQS pour hybrider la courbe.</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\CryptoService.java:4</td>
+            <td><span class="tag">Code Java (JCA)</span></td>
+            <td><strong>Java KeyPairGenerator RSA/ECC (Vulnérable à Shor)</strong><br><span class="detected">KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Utiliser BouncyCastle PQC (bcprov-jdk18on 1.78+) avec ML-KEM (Kyber) ou ML-DSA (Dilithium).</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\tls_auth.go:3</td>
+            <td><span class="tag">Code Go (Stdlib)</span></td>
+            <td><strong>Go crypto/rsa ou crypto/ecdsa (Vulnérable à Shor)</strong><br><span class="detected">func gen() { _, _ = rsa.GenerateKey(rand.Reader, 2048) }</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Migrer vers crypto/mlkem (Go 1.24+) ou cloudflare/circl pour l'encapsulation hybride X25519MLKEM768.</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\jwt_signer.js:2</td>
+            <td><span class="tag">Code Node.js / TS</span></td>
+            <td><strong>Node.js crypto RSA / ECDSA (Vulnérable à Shor)</strong><br><span class="detected">const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Migrer vers un binding liboqs / OpenSSL 3.2+ ou WebCrypto supportant ML-KEM (FIPS 203) et ML-DSA (FIPS 204).</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\jwt_signer.js:3</td>
+            <td><span class="tag">Code Node.js / TS</span></td>
+            <td><strong>Hachage Node.js SHA-1 / MD5 Obsolète</strong><br><span class="detected">const hash = crypto.createHash('md5').update('token').digest('hex');</span></td>
+            <td><span class="badge" style="background:#F59E0B20;color:#F59E0B;border:1px solid #F59E0B50;">ÉLEVÉ</span></td>
+            <td>Utiliser crypto.createHash('sha256') ou 'sha3-256'.</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\token_service.ts:2</td>
+            <td><span class="tag">Code Node.js / TS</span></td>
+            <td><strong>Node.js crypto RSA / ECDSA (Vulnérable à Shor)</strong><br><span class="detected">export const kp = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Migrer vers un binding liboqs / OpenSSL 3.2+ ou WebCrypto supportant ML-KEM (FIPS 203) et ML-DSA (FIPS 204).</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\AuthController.cs:4</td>
+            <td><span class="tag">Code C# (.NET)</span></td>
+            <td><strong>.NET RSA / ECDsa Asymétrique Classique (Vulnérable à Shor)</strong><br><span class="detected">using var rsa = RSA.Create(2048);</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Migrer vers System.Security.Cryptography.MLKem / MLDsa (.NET 9+) ou BouncyCastle.Cryptography PQC.</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\AuthController.cs:5</td>
+            <td><span class="tag">Code C# (.NET)</span></td>
+            <td><strong>Hachage .NET SHA-1 / MD5 Obsolète</strong><br><span class="detected">using var sha1 = SHA1.Create();</span></td>
+            <td><span class="badge" style="background:#F59E0B20;color:#F59E0B;border:1px solid #F59E0B50;">ÉLEVÉ</span></td>
+            <td>Remplacer par SHA256.Create() ou SHA3_256.Create().</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\nginx.conf:3</td>
+            <td><span class="tag">Infra (Nginx)</span></td>
+            <td><strong>TLS < 1.3</strong><br><span class="detected">ssl_protocols TLSv1.2 TLSv1.3;</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Activer TLSv1.3 (prérequis obligatoire pour l'échange de clés post-quantique ML-KEM).</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\nginx.conf:1</td>
+            <td><span class="tag">Infra (Nginx)</span></td>
+            <td><strong>Échange de clés ECDHE classique</strong><br><span class="detected">Absence de courbe hybride PQC</span></td>
+            <td><span class="badge" style="background:#3B82F620;color:#3B82F6;border:1px solid #3B82F650;">MOYEN</span></td>
+            <td>Ajouter 'ssl_ecdh_curve X25519MLKEM768:X25519;' (Supporté dès OpenSSL 3.2+ / Nginx récent).</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\App.csproj:2</td>
+            <td><span class="tag">Héritage Runtime (.NET)</span></td>
+            <td><strong>Framework .NET < 9.0 (Sans support natif MLKem / MLDsa)</strong><br><span class="detected"><PropertyGroup><TargetFramework>net6.0</TargetFramework></PropertyGroup></span></td>
+            <td><span class="badge" style="background:#3B82F620;color:#3B82F6;border:1px solid #3B82F650;">MOYEN</span></td>
+            <td>Migrer vers <TargetFramework>net9.0</TargetFramework> (System.Security.Cryptography.MLKem) ou ajouter BouncyCastle.Cryptography >= 2.4.0.</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\App.csproj:3</td>
+            <td><span class="tag">Dépendance SCA (NuGet C#)</span></td>
+            <td><strong>Package NuGet BouncyCastle Legacy (Obsolète & sans PQC)</strong><br><span class="detected"><ItemGroup><PackageReference Include="BouncyCastle" Version="1.8.9" /></ItemGroup></span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Remplacer par le package officiel 'BouncyCastle.Cryptography' (version >= 2.4.0) supportant ML-KEM et ML-DSA.</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\Dockerfile.prod:1</td>
+            <td><span class="tag">Conteneur (Docker)</span></td>
+            <td><strong>Image de base Legacy (python:3.9-slim-buster — OpenSSL < 3.2)</strong><br><span class="detected">FROM python:3.9-slim-buster</span></td>
+            <td><span class="badge" style="background:#F59E0B20;color:#F59E0B;border:1px solid #F59E0B50;">ÉLEVÉ</span></td>
+            <td>Migrer vers une image de base récente (ex: bookworm/trixie, ubuntu:24.04, alpine:3.20+, node:22, dotnet:9.0) embarquant OpenSSL 3.2+.</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\Dockerfile.prod:2</td>
+            <td><span class="tag">Conteneur (Docker)</span></td>
+            <td><strong>OpenSSL Obsolète (Incompatible PQC)</strong><br><span class="detected">RUN apt-get update && apt-get install -y openssl=1.1.1k</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Mettre à niveau vers OpenSSL 3.2+ (ou 3.5+) avec oqs-provider pour supporter ML-KEM (FIPS 203) et ML-DSA (FIPS 204).</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\Dockerfile.prod:3</td>
+            <td><span class="tag">Conteneur (Docker)</span></td>
+            <td><strong>Génération de clé RSA/ECC dans l'image</strong><br><span class="detected">RUN openssl genrsa -out server.key 2048</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Ne pas générer de clés asymétriques classiques dans le build Docker ; utiliser des certificats hybrides injectés au runtime.</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\legacy_cert.pem:1</td>
+            <td><span class="tag">Certificat X.509 (PKI)</span></td>
+            <td><strong>Certificat X.509 Classique (RSA/ECDSA)</strong><br><span class="detected">-----BEGIN CERTIFICATE-----</span></td>
+            <td><span class="badge" style="background:#3B82F620;color:#3B82F6;border:1px solid #3B82F650;">MOYEN</span></td>
+            <td>Inventorié dans le CBOM. Vérifier la date d'expiration et préparer la migration vers des certificats hybrides ou ML-DSA (FIPS 204).</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\requirements.txt:1</td>
+            <td><span class="tag">Dépendance SCA (Python)</span></td>
+            <td><strong>Dépendance Python cryptography (39.0.1) incompatible PQC</strong><br><span class="detected">cryptography==39.0.1</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Mettre à niveau vers cryptography>=42.0.0 (OpenSSL 3.2+ compatible ML-KEM).</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\requirements.txt:2</td>
+            <td><span class="tag">Dépendance SCA (Python)</span></td>
+            <td><strong>Dépendance Python pyopenssl (22.1.0) incompatible PQC</strong><br><span class="detected">pyOpenSSL==22.1.0</span></td>
+            <td><span class="badge" style="background:#F59E0B20;color:#F59E0B;border:1px solid #F59E0B50;">ÉLEVÉ</span></td>
+            <td>Mettre à niveau vers pyOpenSSL>=24.0.0 pour supporter OpenSSL 3.2+.</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\traefik.yml:4</td>
+            <td><span class="tag">Infra (Traefik)</span></td>
+            <td><strong>Traefik TLS minVersion < 1.3</strong><br><span class="detected">minVersion: VersionTLS12</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Définir 'minVersion: VersionTLS13' dans tls.options de Traefik.</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\traefik.yml:1</td>
+            <td><span class="tag">Infra (Traefik)</span></td>
+            <td><strong>Traefik ECDHE Classique</strong><br><span class="detected">Absence de courbe post-quantique dans curvePreferences</span></td>
+            <td><span class="badge" style="background:#3B82F620;color:#3B82F6;border:1px solid #3B82F650;">MOYEN</span></td>
+            <td>Configurer 'curvePreferences: [X25519MLKEM768, X25519]' dans tls.options (Traefik v3.1+).</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\k8s-ingress.yaml:6</td>
+            <td><span class="tag">Infra (K8s Ingress)</span></td>
+            <td><strong>Annotation Ingress TLS < 1.3</strong><br><span class="detected">nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2"</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Forcer 'nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.3"'.</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\k8s-ingress.yaml:1</td>
+            <td><span class="tag">Infra (K8s Ingress)</span></td>
+            <td><strong>K8s Ingress ECDHE Classique</strong><br><span class="detected">Terminaison TLS Ingress sans courbe hybride PQC</span></td>
+            <td><span class="badge" style="background:#3B82F620;color:#3B82F6;border:1px solid #3B82F650;">MOYEN</span></td>
+            <td>Ajouter l'annotation 'nginx.ingress.kubernetes.io/server-snippet: ssl_ecdh_curve X25519MLKEM768:X25519;'.</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\main.tf:2</td>
+            <td><span class="tag">IaC (Terraform)</span></td>
+            <td><strong>Génération de clé Terraform RSA / ECDSA (Vulnérable à Shor)</strong><br><span class="detected">algorithm = "RSA"</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Remplacer les clés statiques RSA/ECDSA par des mécanismes d'encapsulation hybrides (ML-KEM) ou signatures ML-DSA.</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\main.tf:9</td>
+            <td><span class="tag">IaC (Terraform)</span></td>
+            <td><strong>Politique Cloud Load Balancer / CDN < TLS 1.3</strong><br><span class="detected">ssl_policy = "ELBSecurityPolicy-2016-08"</span></td>
+            <td><span class="badge" style="background:#EF444420;color:#EF4444;border:1px solid #EF444450;">CRITIQUE</span></td>
+            <td>Mettre à niveau vers une politique TLS 1.3 supportant l'échange de clés post-quantique (ex: ELBSecurityPolicy-TLS13-1-2-2021-06 ou PQ-TLS).</td>
+        </tr>
+        <tr>
+            <td class="mono">test_env\modules.tf:1</td>
+            <td><span class="tag">Module IaC (Terraform)</span></td>
+            <td><strong>Module Terraform 'alb_public' héritant d'une politique TLS par défaut (< TLS 1.3)</strong><br><span class="detected">module "alb_public" (source: terraform-aws-modules/alb/aws)</span></td>
+            <td><span class="badge" style="background:#F59E0B20;color:#F59E0B;border:1px solid #F59E0B50;">ÉLEVÉ</span></td>
+            <td>Surcharger explicitement 'ssl_policy = "ELBSecurityPolicy-TLS13-1-2-2021-06"' (ou équivalent TLS 1.3 PQC) dans les paramètres du module.</td>
+        </tr>
+            </tbody>
+        </table>
+
+        <div class="cta-box">
+            <div>
+                <div style="font-weight:700;font-size:15px;color:#fff;">🚀 Automatisez la remédiation Post-Quantique avec Shorless SaaS</div>
+                <div style="font-size:12px;color:#D1FAE5;margin-top:4px;">
+                    Lancez <code>shorless . --fix</code> en local ou activez l'agent Auto-PR sur GitHub / GitLab pour corriger vos configurations TLS, dépendances SCA &amp; IaC automatiquement.
+                </div>
+            </div>
+            <a href="https://shorless.io" target="_blank" style="background:#10B981;color:#06080D;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:700;font-size:12px;white-space:nowrap;">
+                Essai SaaS Gratuit →
+            </a>
+        </div>
+
+        <div class="footer">
+            Généré par Shorless PQC &amp; CBOM Scanner v0.9.8 (Open Source Apache 2.0) • https://shorless.io
+        </div>
+    </div>
+</body>
+</html>

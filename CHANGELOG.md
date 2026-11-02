@@ -1,10 +1,13 @@
 # Changelog — Shorless PQC & CBOM Scanner
 
-## [v0.9.8] — 2026-11-02 : SCA Tous Langages (.NET/Java/Go/Py/JS), Héritages IaC (Modules Terraform & Docker), SARIF 2.1.0 & Multi-Projets
-- Analyse des dépendances SCA pour tous les langages supportés (requirements.txt, Pipfile, package-lock.json, go.mod, pom.xml, build.gradle, *.csproj NuGet, Cargo.toml) et auto-remédiation SCA via --fix
-- Analyse des héritages IaC : modules Terraform (module '...') sans override TLS 1.3, héritage multi-stage Dockerfile (FROM ... AS) et sous-charts Helm (Chart.yaml)
-- Export natif OASIS SARIF 2.1.0 (--sarif), détection des certificats X.509 / clés statiques (.pem, .crt, .key) et gestion des exceptions (.shorlessignore)
-- Compatibilité Multi-Forges (GitHub PR, GitLab Merge Request, Bitbucket PR), suivi Multi-Projets (--project), Webhooks Slack/Teams et badges SVG dynamiques (api_badge.php).
+## [v1.0.0] — 2026-11-02 : Version Majeure 1.0.0 — Simulateur MTU, Envoy/Istio/SSH, Audit JWT/OIDC, Diff PQC & Attestation NIS 2 / DORA
+- Simulateur d'impact réseau MTU (1 500 octets) et fragmentation TCP/TLS (--simulate-mtu) comparant X25519MLKEM768, ML-DSA-65 et les Merkle Tree Certificates (MTC)
+- Inspection et auto-remédiation des proxys Cloud-Native (Envoy Proxy, Istio, HAProxy) et d'OpenSSH (sshd_config, ssh_config avec KexAlgorithms mlkem768x25519-sha256)
+- Détection des signatures JWT/OIDC asymétriques (RS256, ES256, PS256) sur les 6 langages Backend et inspection X.509 approfondie (algorithme, taille de clé, date d'expiration)
+- Console SaaS v1.0.0 : Comparateur temporel Diff PQC (+X pts / risques éliminés), générateur d'Attestation de Conformité NIS 2 / DORA en 1 clic et Monitoring Externe des Endpoints TLS (api_tls_monitor.php).
+
+## [v0.9.8] — 2026-11-02 : SCA Tous Langages, Héritages IaC, SARIF 2.1.0 & Multi-Projets
+- Test complet v0.9.8
 
 ## [v0.9.7] — 2026-11-02 : Mode Inventaire Verbeux (--verbose) & Probabilité d'Exposition Crypto
 - Ajout de l'option CLI --verbose (-v) affichant la liste détaillée des fichiers analysés, leur technologie détectée et la probabilité heuristique (%) de présence cryptographique

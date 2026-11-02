@@ -1,8 +1,8 @@
 # ⚡ Shorless — Post-Quantum (PQC) DevSecOps Scanner, Auto-PR & CycloneDX 1.6 CBOM Generator
 
-[![PyPI version](https://img.shields.io/badge/pypi-v0.9.8-10B981.svg)](https://pypi.org/project/shorless/)
+[![PyPI version](https://img.shields.io/badge/pypi-v1.0.0-10B981.svg)](https://pypi.org/project/shorless/)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Shorless%20PQC%20Action-2088FF.svg?logo=github-actions&logoColor=white)](https://github.com/marketplace/actions/shorless-pqc-cyclonedx-1-6-cbom-scanner)
-[![GitHub Release](https://img.shields.io/badge/release-v0.9.8-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v0.9.8)
+[![GitHub Release](https://img.shields.io/badge/release-v1.0.0-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v1.0.0)
 [![License](https://img.shields.io/badge/license-Apache%202.0-3B82F6.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CycloneDX 1.6](https://img.shields.io/badge/CBOM-CycloneDX%201.6-A855F7.svg)](https://cyclonedx.org/capabilities/cbom/)
 [![PQC Score](https://shorless.io/api_badge.php?project=Shorless/scanner)](https://shorless.io/dashboard.html)
@@ -15,12 +15,12 @@
 
 ---
 
-## 🆕 Nouveautés de la version v0.9.8 (SCA Tous Langages (.NET/Java/Go/Py/JS), Héritages IaC (Modules Terraform & Docker), SARIF 2.1.0 & Multi-Projets)
+## 🆕 Nouveautés de la version v1.0.0 (Version Majeure 1.0.0 — Simulateur MTU, Envoy/Istio/SSH, Audit JWT/OIDC, Diff PQC & Attestation NIS 2 / DORA)
 
-- Analyse des dépendances SCA pour tous les langages supportés (requirements.txt, Pipfile, package-lock.json, go.mod, pom.xml, build.gradle, *.csproj NuGet, Cargo.toml) et auto-remédiation SCA via --fix
-- Analyse des héritages IaC : modules Terraform (module '...') sans override TLS 1.3, héritage multi-stage Dockerfile (FROM ... AS) et sous-charts Helm (Chart.yaml)
-- Export natif OASIS SARIF 2.1.0 (--sarif), détection des certificats X.509 / clés statiques (.pem, .crt, .key) et gestion des exceptions (.shorlessignore)
-- Compatibilité Multi-Forges (GitHub PR, GitLab Merge Request, Bitbucket PR), suivi Multi-Projets (--project), Webhooks Slack/Teams et badges SVG dynamiques (api_badge.php).
+- Simulateur d'impact réseau MTU (1 500 octets) et fragmentation TCP/TLS (--simulate-mtu) comparant X25519MLKEM768, ML-DSA-65 et les Merkle Tree Certificates (MTC)
+- Inspection et auto-remédiation des proxys Cloud-Native (Envoy Proxy, Istio, HAProxy) et d'OpenSSH (sshd_config, ssh_config avec KexAlgorithms mlkem768x25519-sha256)
+- Détection des signatures JWT/OIDC asymétriques (RS256, ES256, PS256) sur les 6 langages Backend et inspection X.509 approfondie (algorithme, taille de clé, date d'expiration)
+- Console SaaS v1.0.0 : Comparateur temporel Diff PQC (+X pts / risques éliminés), générateur d'Attestation de Conformité NIS 2 / DORA en 1 clic et Monitoring Externe des Endpoints TLS (api_tls_monitor.php).
 
 ---
 
@@ -78,7 +78,7 @@ shorless . --check-tls https://api.entreprise.fr --cbom cbom.json --ci
 
 ---
 
-## 🤖 Intégration GitHub Action Officielle (`Shorless/scanner@v0` / `@v0.9.8`)
+## 🤖 Intégration GitHub Action Officielle (`Shorless/scanner@v0` / `@v1.0.0`)
 
 Disponible sur le **[GitHub Marketplace](https://github.com/marketplace/actions/shorless-pqc-cyclonedx-1-6-cbom-scanner)**. Ajoutez ce workflow dans `.github/workflows/shorless-pqc.yml` :
 

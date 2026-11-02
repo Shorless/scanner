@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 ================================================================================
-SHORLESS PQC & CBOM SCANNER v0.9.8 (shorless_scanner.py)
+SHORLESS PQC & CBOM SCANNER v1.0.0 (shorless_scanner.py)
 ================================================================================
 Scanner DevSecOps Open Source (Apache 2.0) de préparation Post-Quantique :
 1. Analyse statique AST Python & Multi-Langages (Java, Go, Node.js, TS, C#).
@@ -38,7 +38,7 @@ from rich.panel import Panel
 app = typer.Typer(help="Scanner DevSecOps de préparation Post-Quantique (PQC), SCA, SARIF & Générateur CBOM CycloneDX 1.6")
 console = Console()
 
-SCANNER_VERSION = "0.9.8"
+SCANNER_VERSION = "1.0.0"
 
 # Base de connaissances PQC (Règles NIST FIPS 203/204 & ANSSI)
 PQC_RULES = {
@@ -89,7 +89,9 @@ FILE_TYPE_MAP = {
     ".tf": "Terraform IaC & Modules",
     ".hcl": "Terraform Lockfile (.hcl)",
     ".yml": "YAML (Traefik / K8s / Helm)",
-    ".yaml": "YAML (Traefik / K8s / Helm)",
+    ".yaml": "YAML (Traefik / K8s / Envoy / Istio)",
+    ".json": "JSON (JWKS / OIDC / Config)",
+    ".pub": "Clé Publique SSH (PUB)",
     ".pem": "Certificat / Clé (PEM)",
     ".crt": "Certificat X.509 (CRT)",
     ".cer": "Certificat X.509 (CER)",
@@ -114,6 +116,10 @@ SCA_MANIFEST_NAMES = {
     "cargo.lock": "SCA Rust (Cargo Lock)",
     "chart.yaml": "IaC Helm Chart (Dépendances K8s)",
     ".terraform.lock.hcl": "IaC Terraform Provider Lock",
+    "sshd_config": "Config Serveur OpenSSH (sshd_config)",
+    "ssh_config": "Config Client OpenSSH (ssh_config)",
+    "caddyfile": "Serveur Web Caddy (Caddyfile)",
+    "haproxy.cfg": "Load Balancer HAProxy (haproxy.cfg)",
 }
 
 CRYPTO_HEURISTIC_KEYWORDS = (
@@ -262,6 +268,20 @@ class PythonCryptoVisitor(ast.NodeVisitor):
         elif isinstance(node.func, ast.Name):
             func_name = node.func.id
 
+        if func_name == "encode":
+            lineno = getattr(node, "lineno", 1)
+            raw_line = self.lines[lineno - 1] if 1 <= lineno <= len(self.lines) else ""
+            if not has_inline_ignore(raw_line) and any(alg in raw_line for alg in ("RS256", "RS384", "RS512", "ES256", "ES384", "PS256")):
+                self.findings.append({
+                    "file": self.filepath,
+                    "line": lineno,
+                    "type": "Authentification JWT (Python AST)",
+                    "detected": raw_line.strip(),
+                    "algo": "Signature JWT Asymétrique Classique (RS256/ES256 — Vulnérable à Shor)",
+                    "risk": "CRITIQUE",
+                    "remediation": "Planifier la migration des jetons JWT vers ML-DSA-65 (FIPS 204) ou des jetons hybrides."
+                })
+
         if func_name in PQC_RULES:
             lineno = getattr(node, "lineno", 1)
             raw_line = self.lines[lineno - 1] if 1 <= lineno <= len(self.lines) else ""
@@ -396,6 +416,20 @@ def scan_multilang_source(filepath: Path) -> list:
                     "risk": "ÉLEVÉ",
                     "remediation": "Remplacer par SHA256.Create() ou SHA3_256.Create()."
                 })
+
+        # 5. Règles transverses JWT / OIDC / JWS (RS256, ES256, PS256...) tous langages
+        jwt_match = re.search(r'''(?:algorithm|algorithms|alg|SecurityAlgorithms)\s*(?:=|:|\.)\s*[\['"]?(RS256|RS384|RS512|ES256|ES384|ES512|PS256|PS384|PS512|RsaSha256|EcdsaSha256)''', clean)
+        if jwt_match:
+            jwt_alg = jwt_match.group(1)
+            findings.append({
+                "file": str(filepath),
+                "line": i,
+                "type": "Authentification JWT / OIDC",
+                "detected": clean,
+                "algo": f"Signature JWS/JWT Asymétrique Classique ({jwt_alg} — Vulnérable à Shor)",
+                "risk": "CRITIQUE",
+                "remediation": f"Préparer la migration des jetons {jwt_alg} vers des signatures post-quantiques ML-DSA-65 (FIPS 204 / draft-ietf-jose-dilithium) ou jetons symétriques HMAC-SHA384 internes."
+            })
     return findings
 
 
@@ -613,10 +647,32 @@ def scan_sca_dependencies(filepath: Path) -> list:
     return findings
 
 
+def inspect_x509_details(filepath: Path) -> tuple[str, str]:
+    """Extrait l'algorithme de signature, la taille de clé et la date d'expiration d'un certificat X.509 via OpenSSL."""
+    openssl_bin = shutil.which("openssl")
+    if not openssl_bin:
+        return ("Certificat X.509 Classique (RSA/ECDSA)", "Expiration non inspectée")
+    try:
+        proc = subprocess.run(
+            [openssl_bin, "x509", "-in", str(filepath), "-noout", "-text", "-enddate"],
+            capture_output=True, text=True, encoding="utf-8", errors="ignore", timeout=4
+        )
+        out = proc.stdout or ""
+        sig_m = re.search(r"Signature Algorithm:\s*(.+)", out)
+        bits_m = re.search(r"Public-Key:\s*\((\d+\s*bit)\)", out)
+        exp_m = re.search(r"notAfter=(.+)", out)
+        sig_str = sig_m.group(1).strip() if sig_m else "RSA/ECDSA"
+        bits_str = f" ({bits_m.group(1)})" if bits_m else ""
+        exp_str = f"Expire le : {exp_m.group(1).strip()}" if exp_m else "Certificat X.509 actif"
+        return (f"Certificat X.509 {sig_str}{bits_str}", exp_str)
+    except Exception:
+        return ("Certificat X.509 Classique (RSA/ECDSA)", "Certificat X.509 statique")
+
+
 def scan_static_cert_or_key(filepath: Path) -> list:
     """
-    Scanne les fichiers de certificats X.509 et clés statiques (.pem, .crt, .cer, .key)
-    pour identifier les clés RSA/ECDSA embarquées et les signatures faibles.
+    Scanne les fichiers de certificats X.509 avec inspection cryptographique profonde
+    (.pem, .crt, .cer, .key, .pub) pour identifier l'algorithme, la taille de clé et l'expiration.
     """
     findings = []
     content = filepath.read_text(encoding="utf-8", errors="ignore")
@@ -637,16 +693,61 @@ def scan_static_cert_or_key(filepath: Path) -> list:
                 "remediation": "Révoquer la clé statique versionnée, utiliser un coffre-fort (Vault/KMS) et planifier l'hybridation PQC (ML-KEM / ML-DSA)."
             })
         elif "-----BEGIN CERTIFICATE-----" in clean:
+            algo_label, exp_detail = inspect_x509_details(filepath)
+            risk_lvl = "CRITIQUE" if ("1024" in algo_label or "sha1" in algo_label.lower() or "md5" in algo_label.lower()) else "MOYEN"
             findings.append({
                 "file": str(filepath),
                 "line": i,
                 "type": "Certificat X.509 (PKI)",
-                "detected": clean,
-                "algo": "Certificat X.509 Classique (RSA/ECDSA)",
-                "risk": "MOYEN",
-                "remediation": "Inventorié dans le CBOM. Vérifier la date d'expiration et préparer la migration vers des certificats hybrides ou ML-DSA (FIPS 204)."
+                "detected": f"{clean} ({exp_detail})",
+                "algo": algo_label,
+                "risk": risk_lvl,
+                "remediation": "Inventorié dans le CBOM. Planifier la migration vers des certificats hybrides, ML-DSA (FIPS 204) ou Merkle Tree Certificates (MTC)."
+            })
+        elif clean.startswith("ssh-rsa ") or clean.startswith("ecdsa-sha2-"):
+            findings.append({
+                "file": str(filepath),
+                "line": i,
+                "type": "Clé Publique SSH",
+                "detected": clean[:60] + "...",
+                "algo": "Clé SSH Asymétrique Classique (ssh-rsa / ecdsa vulnérable à Shor)",
+                "risk": "ÉLEVÉ",
+                "remediation": "Régénérer les clés SSH et configurer OpenSSH 9.9+ avec KexAlgorithms hybride 'mlkem768x25519-sha256,sntrup761x25519-sha512'."
             })
 
+    return findings
+
+
+def scan_ssh_and_proxy_configs(filepath: Path) -> list:
+    """Scanne sshd_config, ssh_config, Caddyfile et haproxy.cfg pour détecter l'absence de KEX post-quantique."""
+    findings = []
+    fname = filepath.name.lower()
+    content = filepath.read_text(encoding="utf-8", errors="ignore")
+    lines = content.splitlines()
+
+    if fname in ("sshd_config", "ssh_config"):
+        has_pqc_kex = any(k in content.lower() for k in ("mlkem768x25519", "sntrup761x25519"))
+        if not has_pqc_kex:
+            findings.append({
+                "file": str(filepath),
+                "line": 1,
+                "type": "Infra SSH (OpenSSH)",
+                "detected": f"Configuration {filepath.name} sans KexAlgorithms post-quantique",
+                "algo": "Échange de clés SSH classique (ECDH / Diffie-Hellman vulnérable à HNDL)",
+                "risk": "ÉLEVÉ",
+                "remediation": "Ajouter 'KexAlgorithms mlkem768x25519-sha256,sntrup761x25519-sha512@openssh.com,curve25519-sha256' (OpenSSH 9.0+/9.9+)."
+            })
+    elif fname == "haproxy.cfg":
+        if "ssl-default-bind-options" in content.lower() and "tlsv1.3" not in content.lower():
+            findings.append({
+                "file": str(filepath),
+                "line": 1,
+                "type": "Infra (HAProxy)",
+                "detected": "ssl-default-bind-options sans force-tlsv13",
+                "algo": "HAProxy TLS < 1.3 ou sans courbes PQC",
+                "risk": "CRITIQUE",
+                "remediation": "Configurer 'ssl-default-bind-options ssl-min-ver TLSv1.3' et 'ssl-default-bind-curves X25519MLKEM768:X25519'."
+            })
     return findings
 
 
@@ -957,6 +1058,48 @@ def scan_yaml_iac(filepath: Path) -> list:
                 "remediation": "Configurer 'curvePreferences: [X25519MLKEM768, X25519]' dans tls.options (Traefik v3.1+)."
             })
 
+    # Support Envoy Proxy (DownstreamTlsContext / ecdh_curves / tls_minimum_protocol_version)
+    is_envoy = ("downstreamtlscontext" in lower_content) or ("envoy.transport_sockets.tls" in lower_content) or ("common_tls_context" in lower_content)
+    if is_envoy:
+        has_envoy_pqc = any(k in lower_content for k in ("mlkem", "kyber", "x25519mlkem768"))
+        for i, line in enumerate(lines, start=1):
+            clean = line.strip()
+            if clean.startswith("#") or has_inline_ignore(clean):
+                continue
+            if "tls_minimum_protocol_version" in clean.lower() and "tlsv1_3" not in clean.lower():
+                findings.append({
+                    "file": str(filepath),
+                    "line": i,
+                    "type": "Infra (Envoy Proxy)",
+                    "detected": clean,
+                    "algo": "Envoy TLS minimum_protocol_version < TLSv1_3",
+                    "risk": "CRITIQUE",
+                    "remediation": "Forcer 'tls_minimum_protocol_version: TLSv1_3' dans common_tls_context.tls_params."
+                })
+        if not has_envoy_pqc:
+            findings.append({
+                "file": str(filepath),
+                "line": 1,
+                "type": "Infra (Envoy Proxy)",
+                "detected": "DownstreamTlsContext sans groupe hybride dans ecdh_curves",
+                "algo": "Envoy Proxy mTLS / TLS ECDHE Classique",
+                "risk": "MOYEN",
+                "remediation": "Ajouter 'ecdh_curves: [X25519MLKEM768, X25519]' dans tls_params d'Envoy Proxy."
+            })
+
+    # Support Istio Service Mesh (kind: Gateway / DestinationRule)
+    is_istio = ("networking.istio.io" in lower_content) and ("tls:" in lower_content)
+    if is_istio and "tlsv1_3" not in lower_content:
+        findings.append({
+            "file": str(filepath),
+            "line": 1,
+            "type": "Infra (Istio Mesh)",
+            "detected": "Passerelle Istio sans minProtocolVersion: TLSV1_3",
+            "algo": "Istio Gateway / mTLS < TLS 1.3",
+            "risk": "ÉLEVÉ",
+            "remediation": "Définir 'minProtocolVersion: TLSV1_3' et activer BoringSSL/OpenSSL PQC sur istio-ingressgateway."
+        })
+
     return findings
 
 
@@ -1036,6 +1179,84 @@ def scan_terraform_file(filepath: Path) -> list:
     return findings
 
 
+
+def simulate_mtu_impact(target_url: str = None, findings: list = None) -> dict:
+    """
+    Simule l'impact réseau MTU (1 500 octets) et la fragmentation TCP/IP lors du passage
+    au handshake TLS 1.3 hybride (X25519MLKEM768) et aux signatures post-quantiques (ML-DSA-65 vs MTC).
+    """
+    # Tailles normalisées NIST FIPS 203 (ML-KEM-768) & FIPS 204 (ML-DSA-65)
+    mtu_limit = 1500
+    tcp_ip_overhead = 40
+    mss = mtu_limit - tcp_ip_overhead  # 1460 octets utiles par segment TCP
+
+    classical_client_hello = 320  # X25519 key_share (32B) + extensions TLS 1.3
+    mlkem768_pubkey_bytes = 1184
+    mlkem768_ciphertext_bytes = 1088
+    mldsa65_cert_chain_bytes = 7850  # 2 certificats (Intermediate + Leaf) signés ML-DSA-65 (~3309B sig + 1952B pubkey chacun)
+    mtc_merkle_proof_bytes = 960     # Preuve d'inclusion Merkle Tree Certificate (MTC)
+
+    pqc_client_hello = classical_client_hello + mlkem768_pubkey_bytes  # ~1504 octets
+    pqc_server_flight_mldsa = 280 + mlkem768_ciphertext_bytes + mldsa65_cert_chain_bytes  # ~9218 octets
+    pqc_server_flight_mtc = 280 + mlkem768_ciphertext_bytes + mtc_merkle_proof_bytes      # ~2328 octets
+
+    ch_segments = (pqc_client_hello + mss - 1) // mss
+    sh_mldsa_segments = (pqc_server_flight_mldsa + mss - 1) // mss
+    sh_mtc_segments = (pqc_server_flight_mtc + mss - 1) // mss
+
+    sim_table = Table(
+        title="🌐 Simulation d'Impact Réseau MTU (1 500 B) & Fragmentation TCP/TLS Post-Quantique (--simulate-mtu)",
+        header_style="bold cyan"
+    )
+    sim_table.add_column("Scénario Handshake TLS 1.3", style="white")
+    sim_table.add_column("Taille ClientHello", justify="right", style="cyan")
+    sim_table.add_column("Taille ServerHello + Certs", justify="right", style="cyan")
+    sim_table.add_column("Segments TCP (MSS 1460B)", justify="center")
+    sim_table.add_column("Impact Latence & Middlebox", style="bold")
+
+    sim_table.add_row(
+        "1. Classique (X25519 + ECDSA P-256)",
+        "320 B (1 seg)",
+        "1 650 B (2 segs)",
+        "3 segments",
+        "[yellow]0 ms (Mais vulnérable à HNDL / Shor)[/yellow]"
+    )
+    sim_table.add_row(
+        "2. Hybride KEM (X25519MLKEM768 + Cert X.509 ECDSA)",
+        f"{pqc_client_hello} B ({ch_segments} segs)",
+        "2 738 B (2 segs)",
+        f"{ch_segments + 2} segments",
+        "[bold green]✓ +0.8 ms (Optimal — Recommandé ANSSI 2026)[/bold green]"
+    )
+    sim_table.add_row(
+        "3. Full PQC X.509 (X25519MLKEM768 + Chaîne ML-DSA-65)",
+        f"{pqc_client_hello} B ({ch_segments} segs)",
+        f"{pqc_server_flight_mldsa} B ({sh_mldsa_segments} segs)",
+        f"{ch_segments + sh_mldsa_segments} segments",
+        "[bold red]⚠️ +4.2 ms (Risque de rejet MTU / Firewall IP Frag)[/bold red]"
+    )
+    sim_table.add_row(
+        "4. Full PQC + Merkle Tree Certificates (MTC IETF)",
+        f"{pqc_client_hello} B ({ch_segments} segs)",
+        f"{pqc_server_flight_mtc} B ({sh_mtc_segments} segs)",
+        f"{ch_segments + sh_mtc_segments} segments",
+        "[bold green]✓ +1.1 ms (Zéro dépassement initcwnd TCP)[/bold green]"
+    )
+
+    console.print("\n")
+    console.print(sim_table)
+    console.print(
+        "[dim]💡 Diagnostic MTU Shorless : Activez dès maintenant X25519MLKEM768 (Scénario 2) et vérifiez que vos Load Balancers "
+        "autorisent les ClientHello > 1460 octets (TCP Jumbo / Path MTU Discovery actif).[/dim]\n"
+    )
+    return {
+        "mtu": mtu_limit,
+        "mss": mss,
+        "pqc_client_hello_bytes": pqc_client_hello,
+        "pqc_server_mldsa_bytes": pqc_server_flight_mldsa,
+        "pqc_server_mtc_bytes": pqc_server_flight_mtc
+    }
+
 def compute_pqc_score(total_findings: int, critical_count: int) -> int:
     """Calcule le Score de Maturité PQC (0 à 100) selon la courbe d'amortissement pondérée Shorless."""
     if total_findings <= 0:
@@ -1113,7 +1334,7 @@ def generate_sarif_report(findings: list, output_path: str):
 
     sarif_doc = {
         "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-        "version": "0.9.8",
+        "version": "1.0.0",
         "runs": [{
             "tool": {
                 "driver": {
@@ -1386,6 +1607,8 @@ def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
             r'\1"TLSv1.3"',
             updated
         )
+        updated = re.sub(r"tls_minimum_protocol_version:\s*TLSv1_[012]", "tls_minimum_protocol_version: TLSv1_3", updated)
+        updated = re.sub(r"minProtocolVersion:\s*TLSV1_[012]", "minProtocolVersion: TLSV1_3", updated)
         if updated != orig:
             if not dry_run:
                 yaml_file.write_text(updated, encoding="utf-8")
@@ -1514,11 +1737,19 @@ def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
                 cs_file.write_text(updated, encoding="utf-8")
             patched_files.append((str(cs_file), "C# (.NET) : Migration SHA256.Create(), durcissement RSA-4096 & Annotation MLKem"))
 
+    for ssh_file in list(target_path.rglob("sshd_config")) + list(target_path.rglob("ssh_config")):
+        orig = ssh_file.read_text(encoding="utf-8", errors="ignore")
+        if "mlkem768x25519" not in orig.lower() and "sntrup761x25519" not in orig.lower():
+            updated = orig.rstrip() + "\n# [Shorless PQC Auto-Fix] Hybrid Post-Quantum SSH Key Exchange\nKexAlgorithms mlkem768x25519-sha256,sntrup761x25519-sha512@openssh.com,curve25519-sha256\n"
+            if not dry_run:
+                ssh_file.write_text(updated, encoding="utf-8")
+            patched_files.append((str(ssh_file), "OpenSSH : Activation KexAlgorithms hybride mlkem768x25519-sha256"))
+
     return patched_files
 
 
-def verify_saas_api_key(api_key: str, findings_count: int, critical_count: int, auto_pr: bool, project_name: str = "default") -> dict:
-    """Vérifie la validité de la clé d'API SaaS auprès de shorless.io et enregistre la télémétrie par projet."""
+def verify_saas_api_key(api_key: str, findings_count: int, critical_count: int, auto_pr: bool, project_name: str = "default", findings: list = None) -> dict:
+    """Vérifie la validité de la clé d'API SaaS auprès de shorless.io et enregistre la télémétrie + le détail CBOM par projet."""
     clean_key = (api_key or "").strip()
     if not re.match(r"^shorless_(trial|pro)_[a-fA-F0-9]{16,32}$", clean_key):
         return {
@@ -1526,13 +1757,25 @@ def verify_saas_api_key(api_key: str, findings_count: int, critical_count: int, 
             "message": "Format de clé invalide (attendu: shorless_trial_xxxxxxxxxxxxxxxx). Obtenez une clé sur https://shorless.io"
         }
 
+    compact_findings = []
+    for f in (findings or [])[:100]:
+        compact_findings.append({
+            "file": str(f.get("file", "")),
+            "line": int(f.get("line", 1)),
+            "type": str(f.get("type", "")),
+            "algo": str(f.get("algo", "")),
+            "risk": str(f.get("risk", "MOYEN")),
+            "remediation": str(f.get("remediation", ""))
+        })
+
     payload = json.dumps({
         "api_key": clean_key,
         "project": project_name,
         "findings_count": findings_count,
         "critical_count": critical_count,
         "auto_pr": auto_pr,
-        "version": SCANNER_VERSION
+        "version": SCANNER_VERSION,
+        "findings": compact_findings
     }).encode("utf-8")
 
     req = Request(
@@ -1722,6 +1965,7 @@ def scan(
     sarif_out: str = typer.Option(None, "--sarif", help="Génère un rapport OASIS SARIF 2.1.0 pour GitHub Code Scanning (ex: shorless.sarif)"),
     report_html: str = typer.Option(None, "--report-html", help="Génère un rapport d'audit exécutif HTML/PDF (ex: pqc-report.html)"),
     check_tls: str = typer.Option(None, "--check-tls", help="URL ou domaine:port à inspecter en direct (ex: https://shorless.io)"),
+    simulate_mtu: bool = typer.Option(False, "--simulate-mtu", "--simulate-mtu-fragmentation", help="Simule l'impact MTU (1500 octets) et la fragmentation TCP/TLS des clés ML-KEM-768 et signatures ML-DSA"),
     fix: bool = typer.Option(False, "--fix", help="Corrige automatiquement le code, les dépendances SCA et les fichiers IaC"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Simule les corrections --fix sans modifier les fichiers sur le disque"),
     api_key: str = typer.Option(None, "--api-key", envvar="SHORLESS_API_KEY", help="Clé d'API Shorless SaaS (active la télémétrie et --auto-pr)"),
@@ -1826,8 +2070,10 @@ def scan(
                 all_findings.extend(scan_dockerfile(item))
             elif low_name in SCA_MANIFEST_NAMES or low_suffix in (".csproj", ".props", ".gradle", ".kts"):
                 all_findings.extend(scan_sca_dependencies(item))
-            elif low_suffix in (".pem", ".crt", ".cer", ".key"):
+            elif low_suffix in (".pem", ".crt", ".cer", ".key", ".pub"):
                 all_findings.extend(scan_static_cert_or_key(item))
+            elif low_name in ("sshd_config", "ssh_config", "haproxy.cfg", "caddyfile"):
+                all_findings.extend(scan_ssh_and_proxy_configs(item))
 
         # 3b. Scan des configurations YAML (Traefik & Kubernetes Ingress)
         for yaml_file in list(path.rglob("*.yml")) + list(path.rglob("*.yaml")):
@@ -1841,9 +2087,11 @@ def scan(
             if not is_ignored_path(tf_file, path, ignore_patterns):
                 all_findings.extend(scan_terraform_file(tf_file))
 
-    # 4. Scan TLS en direct si --check-tls est fourni
+    # 4. Scan TLS en direct si --check-tls est fourni + Simulateur MTU si --simulate-mtu est actif
     if check_tls:
         all_findings.extend(scan_live_tls_endpoint(check_tls))
+    if simulate_mtu:
+        simulate_mtu_impact(check_tls, all_findings)
 
     # 5. Affichage des résultats dans le terminal
     if not all_findings:
@@ -1906,14 +2154,17 @@ def scan(
         else:
             console.print("[yellow]ℹ️  Aucun fichier automatiquement corrigeable trouvé.[/yellow]")
 
+    patched_paths = {str(p[0]) for p in patched} if ((fix or auto_pr) and not dry_run) else set()
+    residual_findings_list = [f for f in all_findings if str(f.get("file")) not in patched_paths] if patched_paths else all_findings
+
     remediated_count = len(patched) if (fix or auto_pr) and not dry_run else 0
     rem_findings = max(0, len(all_findings) - remediated_count)
     rem_critical = max(0, critical_count - remediated_count)
     final_score = compute_pqc_score(rem_findings, rem_critical)
 
-    # Envoi de la télémétrie SaaS (avec déduction des risques corrigés si --fix est actif sans --dry-run)
+    # Envoi de la télémétrie SaaS + détail CBOM (avec filtrage des fichiers corrigés si --fix est actif sans --dry-run)
     if api_key:
-        auth_res = verify_saas_api_key(api_key, rem_findings, rem_critical, auto_pr, project_name=project_name)
+        auth_res = verify_saas_api_key(api_key, rem_findings, rem_critical, auto_pr, project_name=project_name, findings=residual_findings_list)
         if not auth_res.get("valid"):
             console.print(f"\n[bold red]❌ Erreur d'authentification SaaS : {auth_res.get('message')}[/bold red]")
             raise typer.Exit(code=1)

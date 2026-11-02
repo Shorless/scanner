@@ -1,0 +1,486 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:cfac60ac-b642-4c01-a562-2309347d45b1",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-02T10:28:59.334092+00:00",
+    "tools": [
+      {
+        "vendor": "Shorless",
+        "name": "shorless-scanner",
+        "version": "0.9.8"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-0",
+      "name": "RSA / ECC (Asymétrique)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\auth_service.py",
+            "line": 2
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Migrer vers une approche hybride (ex: X25519 + ML-KEM-768) ou signatures ML-DSA."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-1",
+      "name": "ECDSA / ECDH (P-256)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\auth_service.py",
+            "line": 3
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Utiliser liboqs / OpenSSL 3.2+ avec un provider OQS pour hybrider la courbe."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-2",
+      "name": "Java KeyPairGenerator RSA/ECC (Vulnérable à Shor)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\CryptoService.java",
+            "line": 4
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Utiliser BouncyCastle PQC (bcprov-jdk18on 1.78+) avec ML-KEM (Kyber) ou ML-DSA (Dilithium)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-3",
+      "name": "Go crypto/rsa ou crypto/ecdsa (Vulnérable à Shor)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\tls_auth.go",
+            "line": 3
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Migrer vers crypto/mlkem (Go 1.24+) ou cloudflare/circl pour l'encapsulation hybride X25519MLKEM768."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-4",
+      "name": "Node.js crypto RSA / ECDSA (Vulnérable à Shor)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\jwt_signer.js",
+            "line": 2
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Migrer vers un binding liboqs / OpenSSL 3.2+ ou WebCrypto supportant ML-KEM (FIPS 203) et ML-DSA (FIPS 204)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-5",
+      "name": "Hachage Node.js SHA-1 / MD5 Obsolète",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\jwt_signer.js",
+            "line": 3
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Utiliser crypto.createHash('sha256') ou 'sha3-256'."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-6",
+      "name": "Node.js crypto RSA / ECDSA (Vulnérable à Shor)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\token_service.ts",
+            "line": 2
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Migrer vers un binding liboqs / OpenSSL 3.2+ ou WebCrypto supportant ML-KEM (FIPS 203) et ML-DSA (FIPS 204)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-7",
+      "name": ".NET RSA / ECDsa Asymétrique Classique (Vulnérable à Shor)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\AuthController.cs",
+            "line": 4
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Migrer vers System.Security.Cryptography.MLKem / MLDsa (.NET 9+) ou BouncyCastle.Cryptography PQC."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-8",
+      "name": "Hachage .NET SHA-1 / MD5 Obsolète",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\AuthController.cs",
+            "line": 5
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Remplacer par SHA256.Create() ou SHA3_256.Create()."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-9",
+      "name": "TLS < 1.3",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\nginx.conf",
+            "line": 3
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Activer TLSv1.3 (prérequis obligatoire pour l'échange de clés post-quantique ML-KEM)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-10",
+      "name": "Échange de clés ECDHE classique",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\nginx.conf",
+            "line": 1
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Ajouter 'ssl_ecdh_curve X25519MLKEM768:X25519;' (Supporté dès OpenSSL 3.2+ / Nginx récent)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-11",
+      "name": "Framework .NET < 9.0 (Sans support natif MLKem / MLDsa)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\App.csproj",
+            "line": 2
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Migrer vers <TargetFramework>net9.0</TargetFramework> (System.Security.Cryptography.MLKem) ou ajouter BouncyCastle.Cryptography >= 2.4.0."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-12",
+      "name": "Package NuGet BouncyCastle Legacy (Obsolète & sans PQC)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\App.csproj",
+            "line": 3
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Remplacer par le package officiel 'BouncyCastle.Cryptography' (version >= 2.4.0) supportant ML-KEM et ML-DSA."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-13",
+      "name": "Image de base Legacy (python:3.9-slim-buster — OpenSSL < 3.2)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\Dockerfile.prod",
+            "line": 1
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Migrer vers une image de base récente (ex: bookworm/trixie, ubuntu:24.04, alpine:3.20+, node:22, dotnet:9.0) embarquant OpenSSL 3.2+."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-14",
+      "name": "OpenSSL Obsolète (Incompatible PQC)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\Dockerfile.prod",
+            "line": 2
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Mettre à niveau vers OpenSSL 3.2+ (ou 3.5+) avec oqs-provider pour supporter ML-KEM (FIPS 203) et ML-DSA (FIPS 204)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-15",
+      "name": "Génération de clé RSA/ECC dans l'image",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\Dockerfile.prod",
+            "line": 3
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Ne pas générer de clés asymétriques classiques dans le build Docker ; utiliser des certificats hybrides injectés au runtime."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-16",
+      "name": "Certificat X.509 Classique (RSA/ECDSA)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\legacy_cert.pem",
+            "line": 1
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Inventorié dans le CBOM. Vérifier la date d'expiration et préparer la migration vers des certificats hybrides ou ML-DSA (FIPS 204)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-17",
+      "name": "Dépendance Python cryptography (39.0.1) incompatible PQC",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\requirements.txt",
+            "line": 1
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Mettre à niveau vers cryptography>=42.0.0 (OpenSSL 3.2+ compatible ML-KEM)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-18",
+      "name": "Dépendance Python pyopenssl (22.1.0) incompatible PQC",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\requirements.txt",
+            "line": 2
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Mettre à niveau vers pyOpenSSL>=24.0.0 pour supporter OpenSSL 3.2+."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-19",
+      "name": "Traefik TLS minVersion < 1.3",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\traefik.yml",
+            "line": 4
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Définir 'minVersion: VersionTLS13' dans tls.options de Traefik."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-20",
+      "name": "Traefik ECDHE Classique",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\traefik.yml",
+            "line": 1
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Configurer 'curvePreferences: [X25519MLKEM768, X25519]' dans tls.options (Traefik v3.1+)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-21",
+      "name": "Annotation Ingress TLS < 1.3",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\k8s-ingress.yaml",
+            "line": 6
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Forcer 'nginx.ingress.kubernetes.io/ssl-protocols: \"TLSv1.3\"'."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-22",
+      "name": "K8s Ingress ECDHE Classique",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\k8s-ingress.yaml",
+            "line": 1
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Ajouter l'annotation 'nginx.ingress.kubernetes.io/server-snippet: ssl_ecdh_curve X25519MLKEM768:X25519;'."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-23",
+      "name": "Génération de clé Terraform RSA / ECDSA (Vulnérable à Shor)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\main.tf",
+            "line": 2
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Remplacer les clés statiques RSA/ECDSA par des mécanismes d'encapsulation hybrides (ML-KEM) ou signatures ML-DSA."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-24",
+      "name": "Politique Cloud Load Balancer / CDN < TLS 1.3",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\main.tf",
+            "line": 9
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Mettre à niveau vers une politique TLS 1.3 supportant l'échange de clés post-quantique (ex: ELBSecurityPolicy-TLS13-1-2-2021-06 ou PQ-TLS)."
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto-asset-25",
+      "name": "Module Terraform 'alb_public' héritant d'une politique TLS par défaut (< TLS 1.3)",
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "test_env\\modules.tf",
+            "line": 1
+          }
+        ]
+      },
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "quantumSafe": "false",
+        "remediation": "Surcharger explicitement 'ssl_policy = \"ELBSecurityPolicy-TLS13-1-2-2021-06\"' (ou équivalent TLS 1.3 PQC) dans les paramètres du module."
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+static_resources:
+  listeners:
+  - name: edge_listener
+    filter_chains:
+    - transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          common_tls_context:
+            tls_params:
+              tls_minimum_protocol_version: TLSv1_2

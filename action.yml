@@ -94,6 +94,7 @@ runs:
         INPUT_SARIF: ${{ inputs.output-sarif }}
         INPUT_HTML: ${{ inputs.report-html }}
         INPUT_TLS: ${{ inputs.check-tls }}
+        INPUT_MTU: ${{ inputs.simulate-mtu }}
         INPUT_FIX: ${{ inputs.auto-fix }}
         INPUT_DRY: ${{ inputs.dry-run }}
         INPUT_API_KEY: ${{ inputs.api-key }}
@@ -114,6 +115,9 @@ runs:
         fi
         if [ -n "$INPUT_TLS" ]; then
           ARGS+=("--check-tls" "$INPUT_TLS")
+        fi
+        if [ "$INPUT_MTU" = "true" ]; then
+          ARGS+=("--simulate-mtu")
         fi
         if [ "$INPUT_FIX" = "true" ]; then
           ARGS+=("--fix")
