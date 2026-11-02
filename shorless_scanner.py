@@ -68,6 +68,78 @@ PQC_RULES = {
     }
 }
 
+FILE_TYPE_MAP = {
+    ".py": "Python (AST)",
+    ".java": "Java (JCA)",
+    ".go": "Go (Stdlib)",
+    ".js": "Node.js (Crypto)",
+    ".ts": "TypeScript (Crypto)",
+    ".cs": "C# (.NET Crypto)",
+    ".conf": "Nginx Config",
+    ".tf": "Terraform IaC",
+    ".yml": "YAML (Traefik / K8s)",
+    ".yaml": "YAML (Traefik / K8s)",
+}
+
+CRYPTO_HEURISTIC_KEYWORDS = (
+    "rsa", "ecdsa", "secp", "prime256", "ed25519", "x25519", "mlkem", "kyber",
+    "dilithium", "openssl", "ssl_", "tls", "cipher", "crypto", "private_key",
+    "keypair", "sha1", "md5", "cert", "x509", "jwt", "keystore", "pem"
+)
+
+
+def detect_file_type_and_crypto_prob(filepath: Path) -> tuple[str, int, str]:
+    """
+    Détermine le type du fichier et estime la probabilité (0-95 %) qu'il contienne
+    des références au chiffrement ou à la cryptographie (heuristique nom + contenu).
+    """
+    name_lower = filepath.name.lower()
+    suffix_lower = filepath.suffix.lower()
+
+    if filepath.name in ("shorless_scanner.py", "pqc_scanner.py", "release_shorless.py", "cron_generate_article.py") or filepath.name.endswith("_test.html") or filepath.name.endswith("_test.json"):
+        return ("Ignoré / Non supporté", 0, "Faible")
+
+    # 1. Identification du type de fichier
+    if name_lower.startswith("dockerfile"):
+        file_type = "Dockerfile (Container)"
+        base_prob = 50
+    elif suffix_lower in (".yml", ".yaml"):
+        file_type = "YAML (Traefik / K8s)"
+        base_prob = 45
+    elif suffix_lower in FILE_TYPE_MAP:
+        file_type = FILE_TYPE_MAP[suffix_lower]
+        base_prob = 35 if suffix_lower not in (".conf", ".tf") else 60
+    else:
+        return ("Ignoré / Non supporté", 0, "Faible")
+
+    # 2. Bonus heuristique sur le nom du fichier
+    if any(k in name_lower for k in ("auth", "crypto", "tls", "ssl", "jwt", "cert", "sec", "key", "ingress", "nginx", "traefik")):
+        base_prob += 25
+
+    # 3. Analyse rapide de densité lexicale crypto dans le contenu
+    try:
+        content_lower = filepath.read_text(encoding="utf-8", errors="ignore").lower()
+        if suffix_lower in (".yml", ".yaml"):
+            if "ingress" in content_lower or "cert-manager" in content_lower:
+                file_type = "Kubernetes Ingress (YAML)"
+            elif "traefik" in content_lower or "minversion" in content_lower or "curvepreferences" in content_lower:
+                file_type = "Traefik TLS (YAML)"
+
+        matched_keywords = sum(1 for kw in CRYPTO_HEURISTIC_KEYWORDS if kw in content_lower)
+        if matched_keywords >= 4:
+            base_prob += 35
+        elif matched_keywords >= 2:
+            base_prob += 20
+        elif matched_keywords == 1:
+            base_prob += 10
+        else:
+            base_prob = max(5, base_prob - 25)
+    except Exception:
+        pass
+
+    prob = min(95, max(5, base_prob))
+    level = "Élevée" if prob >= 70 else ("Moyenne" if prob >= 40 else "Faible")
+    return (file_type, prob, level)
 
 class PythonCryptoVisitor(ast.NodeVisitor):
     """Analyse l'arbre syntaxique (AST) du code Python pour détecter les appels cryptographiques."""
@@ -545,7 +617,7 @@ def generate_cyclonedx_cbom(findings: list, output_path: str):
         "version": 1,
         "metadata": {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.6"}]
+            "tools": [{"vendor": "Shorless", "name": "shorless-scanner", "version": "0.9.7"}]
         },
         "components": []
     }
@@ -910,7 +982,7 @@ def verify_saas_api_key(api_key: str, findings_count: int, critical_count: int, 
         "findings_count": findings_count,
         "critical_count": critical_count,
         "auto_pr": auto_pr,
-        "version": "0.9.6"
+        "version": "0.9.7"
     }).encode("utf-8")
 
     req = Request(
@@ -918,7 +990,7 @@ def verify_saas_api_key(api_key: str, findings_count: int, critical_count: int, 
         data=payload,
         headers={
             "Content-Type": "application/json",
-            "User-Agent": "Shorless-CLI/0.9.5"
+            "User-Agent": "Shorless-CLI/0.9.6"
         },
         method="POST"
     )
@@ -940,7 +1012,7 @@ def create_automated_pull_request(patched_files: list, findings: list, base_bran
     if not patched_files:
         return ""
 
-    branch_name = f"fix/shorless-pqc-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+    branch_name = f"shorless-pqc-fix-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
     pr_title = "🔒 fix(pqc): Migration Post-Quantique TLS 1.3 & Hybride ML-KEM (Shorless Auto-PR)"
 
     patched_bullets = "\n".join([f"- `{fpath}` : {desc}" for fpath, desc in patched_files])
@@ -1029,6 +1101,11 @@ def scan(
     api_key: str = typer.Option(None, "--api-key", envvar="SHORLESS_API_KEY", help="Clé d'API Shorless SaaS (active la télémétrie et --auto-pr)"),
     auto_pr: bool = typer.Option(False, "--auto-pr", help="Crée une branche Git et ouvre automatiquement une Pull Request avec les correctifs --fix (requiert --api-key)"),
     pr_base: str = typer.Option("main", "--pr-base", help="Branche cible pour la Pull Request automatique (--auto-pr)"),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose", "-v",
+        help="Affiche le détail des fichiers analysés, leur type détecté et la probabilité d'exposition cryptographique."
+    ),
     fail_on_critical: bool = typer.Option(False, "--ci", help="Renvoie un code d'erreur (1) pour bloquer la CI/CD")
 ):
     """Lance un audit de vulnérabilité Post-Quantique sur le code, l'infra (Nginx/Docker) et les endpoints TLS."""
@@ -1038,6 +1115,43 @@ def scan(
     all_findings = []
 
     if path.exists():
+        if verbose:
+            v_table = Table(
+                title="🔍 Inventaire Détaillé des Fichiers Analysés (--verbose)",
+                show_header=True,
+                header_style="bold cyan"
+            )
+            v_table.add_column("Fichier", style="white", no_wrap=False)
+            v_table.add_column("Type Détecté", style="emerald" if hasattr(console, "emerald") else "green")
+            v_table.add_column("Probabilité Crypto", justify="right")
+            v_table.add_column("Indice d'Exposition", justify="center")
+
+            scanned_files_meta = []
+            for root, dirs, files in os.walk(path):
+                dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "node_modules", ".venv", "venv", "dist", "build")]
+                for fname in sorted(files):
+                    fpath = Path(root) / fname
+                    ftype, prob, level = detect_file_type_and_crypto_prob(fpath)
+                    if ftype != "Ignoré / Non supporté":
+                        scanned_files_meta.append((fpath, ftype, prob, level))
+
+            for fpath, ftype, prob, level in scanned_files_meta:
+                rel_path = os.path.relpath(fpath, path)
+                if prob >= 70:
+                    prob_str = f"[bold red]{prob} %[/bold red]"
+                    badge = "[bold red]🔥 ÉLEVÉE[/bold red]"
+                elif prob >= 40:
+                    prob_str = f"[bold yellow]{prob} %[/bold yellow]"
+                    badge = "[yellow]⚠️ MOYENNE[/yellow]"
+                else:
+                    prob_str = f"[dim]{prob} %[/dim]"
+                    badge = "[dim]FAIBLE[/dim]"
+
+                v_table.add_row(str(rel_path), ftype, prob_str, badge)
+
+            console.print(v_table)
+            console.print(f"[dim]ℹ️  {len(scanned_files_meta)} fichier(s) éligible(s) inspecté(s) dans '{path}'.[/dim]\n")
+
         # 1. Scan des fichiers Python (.py)
         for py_file in path.rglob("*.py"):
             if py_file.name in ("shorless_scanner.py", "pqc_scanner.py", "release_shorless.py", "cron_generate_article.py"):
@@ -1123,14 +1237,10 @@ def scan(
         )
         raise typer.Exit(code=1)
 
-    if api_key:
-        auth_res = verify_saas_api_key(api_key, len(all_findings), critical_count, auto_pr)
-        if not auth_res.get("valid"):
-            console.print(f"\n[bold red]❌ Erreur d'authentification SaaS : {auth_res.get('message')}[/bold red]")
-            raise typer.Exit(code=1)
-        console.print(f"\n[bold green]🔑 {auth_res.get('message')}[/bold green]")
+
 
     # 6b. Exécution de l'Auto-Remédiation (--fix, --dry-run ou --auto-pr)
+    patched = []
     if fix or dry_run or auto_pr:
         mode_label = "SIMULATION (--dry-run)" if dry_run else "APPLICATION DES CORRECTIFS (--fix)"
         console.print(f"\n[bold cyan]🛠️  Auto-Remédiation Post-Quantique — {mode_label}[/bold cyan]")
@@ -1141,13 +1251,25 @@ def scan(
                 console.print(f"  {prefix} [white]{fpath}[/white] → [green]{action_desc}[/green]")
             if not dry_run:
                 console.print("\n[bold green]✨ Fichiers mis à jour localement ![/bold green]")
-                if auto_pr:
-                    console.print("[cyan]🚀 Création de la branche Git et ouverture de la Pull Request automatique...[/cyan]")
-                    pr_url = create_automated_pull_request(patched, all_findings, base_branch=pr_base)
-                    if pr_url:
-                        console.print(f"[bold green]✅ Pull Request Post-Quantique ouverte :[/bold green] [underline]{pr_url}[/underline]")
         else:
             console.print("[yellow]ℹ️  Aucun fichier IaC automatiquement corrigeable trouvé.[/yellow]")
+
+    # Envoi de la télémétrie SaaS (avec déduction des risques corrigés si --fix est actif sans --dry-run)
+    if api_key:
+        remediated_count = len(patched) if (fix or auto_pr) and not dry_run else 0
+        rem_findings = max(0, len(all_findings) - remediated_count)
+        rem_critical = max(0, critical_count - remediated_count)
+        auth_res = verify_saas_api_key(api_key, rem_findings, rem_critical, auto_pr)
+        if not auth_res.get("valid"):
+            console.print(f"\n[bold red]❌ Erreur d'authentification SaaS : {auth_res.get('message')}[/bold red]")
+            raise typer.Exit(code=1)
+        console.print(f"\n[bold green]🔑 {auth_res.get('message')}[/bold green]")
+
+    if patched and not dry_run and auto_pr:
+        console.print("[cyan]🚀 Création de la branche Git et ouverture de la Pull Request automatique...[/cyan]")
+        pr_url = create_automated_pull_request(patched, all_findings, base_branch=pr_base)
+        if pr_url:
+            console.print(f"[bold green]✅ Pull Request Post-Quantique ouverte :[/bold green] [underline]{pr_url}[/underline]")
 
     # 7. Génération du Rapport d'Audit Exécutif HTML/PDF si demandé
     if report_html:

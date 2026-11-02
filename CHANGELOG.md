@@ -1,12 +1,20 @@
 # Changelog — Shorless PQC & CBOM Scanner
 
-## [v0.9.6] — 2026-10-31 : Auto-PR Multi-Langages (11 cibles) & Console SaaS CBOM
-- Extension de l'auto-remédiation (--fix et --auto-pr) aux 11 cibles (6 langages Backend + 5 formats IaC)
-- Fiabilisation de la création de branches Git et Pull Requests automatiques
-- Déploiement de la Console SaaS CBOM (dashboard.html, api_dashboard.php) et du Webhook Stripe Pro (api_stripe_webhook.php)
+## [v0.9.7] — 2026-11-02 : Mode Inventaire Verbeux (--verbose) & Probabilité d'Exposition Crypto
+- Ajout de l'option CLI --verbose (-v) affichant la liste détaillée des fichiers analysés, leur technologie détectée et la probabilité heuristique (%) de présence cryptographique
+- Ajout de l'input verbose dans la GitHub Action officielle (action.yml) et mise à jour de l'alias @v0
+- Mise à jour complète de la documentation utilisateur (scanner-documentation.html et README.md).
 
-## [v0.9.5] — 2026-10-31 : Test
-- Test
+## [v0.9.6] — 2026-10-31 : Auto-PR Multi-Langages (11 cibles), Console SaaS CBOM & GitHub Marketplace
+- Extension de l'auto-remédiation (--fix et --auto-pr) aux 11 technologies (6 langages Backend + 5 formats IaC).
+- Fiabilisation de la création automatique de branches Git (shorless-pqc-fix-...) et ouverture de Pull Requests GitHub.
+- Déploiement de la Console SaaS CBOM (dashboard.html) avec courbe de Score PQC amortie et licences Pro Entreprise illimitées.
+- Publication officielle sur le GitHub Marketplace avec support du tag majeur flottant @v0.
+
+## [v0.9.5] — 2026-10-31 : Authentification SaaS (--api-key) & Pull Requests Automatiques (--auto-pr)
+- Ajout des options CLI --api-key, --auto-pr et --pr-base pour synchroniser les audits CI/CD avec Shorless SaaS.
+- Mise à jour de la GitHub Action officielle (action.yml) avec prise en charge automatique de GITHUB_TOKEN.
+- Support des clés d'essai (14 jours) et des clés Pro Entreprise illimitées.
 
 ## [v0.9.4] — 2026-10-31 : Support Multi-Langages Backend (C# .NET)
 - Ajout du scan statique pour  C# .NET (.cs)

@@ -1,15 +1,15 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:ba6d4490-a21e-460a-a76f-9863ad9075ae",
+  "serialNumber": "urn:uuid:ac03d210-0c64-47b7-94d7-4cb1ac4df30a",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-31T16:12:10.491416+00:00",
+    "timestamp": "2026-11-02T08:49:46.057190+00:00",
     "tools": [
       {
         "vendor": "Shorless",
         "name": "shorless-scanner",
-        "version": "0.9.6"
+        "version": "0.9.7"
       }
     ]
   },
@@ -22,7 +22,7 @@
         "occurrences": [
           {
             "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\auth_service.py",
-            "line": 3
+            "line": 2
           }
         ]
       },
@@ -40,7 +40,7 @@
         "occurrences": [
           {
             "location": "C:\\Users\\mathi\\Documents\\Projets\\shorless\\scanner\\test_env\\auth_service.py",
-            "line": 4
+            "line": 3
           }
         ]
       },
