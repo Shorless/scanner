@@ -1,8 +1,8 @@
 # ⚡ Shorless — Post-Quantum (PQC) DevSecOps Scanner, Auto-PR & CycloneDX 1.6 CBOM Generator
 
-[![PyPI version](https://img.shields.io/badge/pypi-v1.0.0-10B981.svg)](https://pypi.org/project/shorless/)
+[![PyPI version](https://img.shields.io/badge/pypi-v1.0.1-10B981.svg)](https://pypi.org/project/shorless/)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Shorless%20PQC%20Action-2088FF.svg?logo=github-actions&logoColor=white)](https://github.com/marketplace/actions/shorless-pqc-cyclonedx-1-6-cbom-scanner)
-[![GitHub Release](https://img.shields.io/badge/release-v1.0.0-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v1.0.0)
+[![GitHub Release](https://img.shields.io/badge/release-v1.0.1-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v1.0.1)
 [![License](https://img.shields.io/badge/license-Apache%202.0-3B82F6.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CycloneDX 1.6](https://img.shields.io/badge/CBOM-CycloneDX%201.6-A855F7.svg)](https://cyclonedx.org/capabilities/cbom/)
 [![PQC Score](https://shorless.io/api_badge.php?project=Shorless/scanner)](https://shorless.io/dashboard.html)
@@ -15,12 +15,12 @@
 
 ---
 
-## 🆕 Nouveautés de la version v1.0.0 (Version Majeure 1.0.0 — Simulateur MTU, Envoy/Istio/SSH, Audit JWT/OIDC, Diff PQC & Attestation NIS 2 / DORA)
+## 🆕 Nouveautés de la version v1.0.1 (Support Bilingue FR/EN (--lang), Barème de Crédits Unifié (500 Crédits Offerts), Conformité CGV/CGU & Suppression RGPD)
 
-- Simulateur d'impact réseau MTU (1 500 octets) et fragmentation TCP/TLS (--simulate-mtu) comparant X25519MLKEM768, ML-DSA-65 et les Merkle Tree Certificates (MTC)
-- Inspection et auto-remédiation des proxys Cloud-Native (Envoy Proxy, Istio, HAProxy) et d'OpenSSH (sshd_config, ssh_config avec KexAlgorithms mlkem768x25519-sha256)
-- Détection des signatures JWT/OIDC asymétriques (RS256, ES256, PS256) sur les 6 langages Backend et inspection X.509 approfondie (algorithme, taille de clé, date d'expiration)
-- Console SaaS v1.0.0 : Comparateur temporel Diff PQC (+X pts / risques éliminés), générateur d'Attestation de Conformité NIS 2 / DORA en 1 clic et Monitoring Externe des Endpoints TLS (api_tls_monitor.php).
+- Ajout de l'option CLI --lang (-l fr|en) et de la variable d'environnement SHORLESS_LANG=en pour exécuter le scanner, les tableaux Rich et la télémétrie SaaS en Français ou en Anglais.
+- Ajout de l'input lang ('fr' ou 'en') dans la GitHub Action officielle (action.yml) et support bilingue complet dans la Console SaaS (dashboard.html) et la documentation.
+- Alignement sur le modèle par crédits (500 crédits offerts à l'essai, 5 crédits/scan CI/CD, 15 crédits avec --auto-pr, 1 crédit/sonde TLS) détaillé dans les CGV.
+- Ajout du workflow RGPD de suppression définitive de compte et des données associées avec double confirmation (case d'impact + lien sécurisé par email).
 
 ---
 
@@ -78,7 +78,7 @@ shorless . --check-tls https://api.entreprise.fr --cbom cbom.json --ci
 
 ---
 
-## 🤖 Intégration GitHub Action Officielle (`Shorless/scanner@v0` / `@v1.0.0`)
+## 🤖 Intégration GitHub Action Officielle (`Shorless/scanner@v0` / `@v1.0.1`)
 
 Disponible sur le **[GitHub Marketplace](https://github.com/marketplace/actions/shorless-pqc-cyclonedx-1-6-cbom-scanner)**. Ajoutez ce workflow dans `.github/workflows/shorless-pqc.yml` :
 

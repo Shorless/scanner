@@ -54,6 +54,10 @@ inputs:
     description: "Branche cible pour la Pull Request automatique (--pr-base)"
     required: false
     default: "main"
+  lang:
+    description: "Langue d'affichage du terminal et des rapports : 'fr' ou 'en' (--lang)"
+    required: false
+    default: "fr"
   verbose:
     description: "Affiche le détail des fichiers analysés, leur type détecté et la probabilité d'exposition cryptographique (--verbose)"
     required: false
@@ -102,10 +106,11 @@ runs:
         INPUT_WEBHOOK: ${{ inputs.webhook-url }}
         INPUT_AUTO_PR: ${{ inputs.auto-pr }}
         INPUT_PR_BASE: ${{ inputs.pr-base }}
+        INPUT_LANG: ${{ inputs.lang }}
         INPUT_VERBOSE: ${{ inputs.verbose }}
         INPUT_CI: ${{ inputs.fail-on-critical }}
       run: |
-        ARGS=("$INPUT_TARGET" "--cbom" "$INPUT_CBOM")
+        ARGS=("$INPUT_TARGET" "--cbom" "$INPUT_CBOM" "--lang" "${INPUT_LANG:-fr}")
 
         if [ -n "$INPUT_SARIF" ]; then
           ARGS+=("--sarif" "$INPUT_SARIF")

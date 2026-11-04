@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 ================================================================================
-SHORLESS PQC & CBOM SCANNER v1.0.0 (shorless_scanner.py)
+SHORLESS PQC & CBOM SCANNER v1.0.1 (shorless_scanner.py)
 ================================================================================
 Scanner DevSecOps Open Source (Apache 2.0) de préparation Post-Quantique :
 1. Analyse statique AST Python & Multi-Langages (Java, Go, Node.js, TS, C#).
@@ -38,7 +38,7 @@ from rich.panel import Panel
 app = typer.Typer(help="Scanner DevSecOps de préparation Post-Quantique (PQC), SCA, SARIF & Générateur CBOM CycloneDX 1.6")
 console = Console()
 
-SCANNER_VERSION = "1.0.0"
+SCANNER_VERSION = "1.0.1"
 
 # Base de connaissances PQC (Règles NIST FIPS 203/204 & ANSSI)
 PQC_RULES = {
@@ -1334,7 +1334,7 @@ def generate_sarif_report(findings: list, output_path: str):
 
     sarif_doc = {
         "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "runs": [{
             "tool": {
                 "driver": {
@@ -1748,6 +1748,27 @@ def apply_auto_remediation(target_path: Path, dry_run: bool = False) -> list:
     return patched_files
 
 
+CLI_LANG = os.environ.get("SHORLESS_LANG", "fr").lower()
+
+def tr_cli(fr_text: str, en_text: str) -> str:
+    return en_text if CLI_LANG == "en" else fr_text
+
+def translate_finding_to_en(f: dict) -> dict:
+    if CLI_LANG != "en":
+        return f
+    out = dict(f)
+    risk_map = {"CRITIQUE": "CRITICAL", "ÉLEVÉ": "HIGH", "MOYEN": "MEDIUM", "FAIBLE": "LOW"}
+    out["risk"] = risk_map.get(out.get("risk", ""), out.get("risk", ""))
+    rem = out.get("remediation", "")
+    rem = rem.replace("Migrer vers une approche hybride", "Migrate to a hybrid approach")
+    rem = rem.replace("Remplacer par", "Replace with")
+    rem = rem.replace("Mettre à niveau vers", "Upgrade to")
+    rem = rem.replace("Activer", "Enable")
+    rem = rem.replace("Forcer", "Enforce")
+    rem = rem.replace("Utiliser", "Use")
+    out["remediation"] = rem
+    return out
+
 def verify_saas_api_key(api_key: str, findings_count: int, critical_count: int, auto_pr: bool, project_name: str = "default", findings: list = None) -> dict:
     """Vérifie la validité de la clé d'API SaaS auprès de shorless.io et enregistre la télémétrie + le détail CBOM par projet."""
     clean_key = (api_key or "").strip()
@@ -1775,6 +1796,7 @@ def verify_saas_api_key(api_key: str, findings_count: int, critical_count: int, 
         "critical_count": critical_count,
         "auto_pr": auto_pr,
         "version": SCANNER_VERSION,
+        "lang": CLI_LANG,
         "findings": compact_findings
     }).encode("utf-8")
 
@@ -1976,12 +1998,24 @@ def scan(
     verbose: bool = typer.Option(
         False,
         "--verbose", "-v",
-        help="Affiche le détail des fichiers analysés, leur type détecté et la probabilité d'exposition cryptographique."
+        help="Affiche le détail des fichiers analysés / Display detailed inventory of scanned files."
     ),
-    fail_on_critical: bool = typer.Option(False, "--ci", help="Renvoie un code d'erreur (1) pour bloquer la CI/CD")
+    lang: str = typer.Option(
+        "fr",
+        "--lang", "-l",
+        envvar="SHORLESS_LANG",
+        help="Langue d'affichage du terminal et des rapports : 'fr' ou 'en' / Output language: 'fr' or 'en'."
+    ),
+    fail_on_critical: bool = typer.Option(False, "--ci", help="Renvoie un code d'erreur (1) pour bloquer la CI/CD / Exit code 1 on critical findings")
 ):
     """Lance un audit Post-Quantique complet (Code 6 langages, 5 IaC, SCA dépendances, Certificats X.509 & TLS Live)."""
-    console.print(Panel.fit(f"[bold cyan]⚡ Shorless PQC-Scanner v{SCANNER_VERSION} — Audit DevSecOps Post-Quantique, SCA & SARIF[/bold cyan]"))
+    global CLI_LANG
+    CLI_LANG = "en" if str(lang).lower().startswith("en") else "fr"
+    banner_txt = tr_cli(
+        f"⚡ Shorless PQC-Scanner v{SCANNER_VERSION} — Audit DevSecOps Post-Quantique, SCA & SARIF",
+        f"⚡ Shorless PQC-Scanner v{SCANNER_VERSION} — Post-Quantum DevSecOps, SCA & SARIF Scanner"
+    )
+    console.print(Panel.fit(f"[bold cyan]{banner_txt}[/bold cyan]"))
 
     path = Path(target_dir)
     all_findings = []
@@ -2095,46 +2129,53 @@ def scan(
 
     # 5. Affichage des résultats dans le terminal
     if not all_findings:
-        console.print("[bold green]✅ Aucune vulnérabilité post-quantique détectée ![/bold green]")
+        console.print(tr_cli(
+            "[bold green]✅ Aucune vulnérabilité post-quantique détectée ![/bold green]",
+            "[bold green]✅ No post-quantum vulnerabilities detected![/bold green]"
+        ))
         if sarif_out:
             generate_sarif_report([], sarif_out)
         raise typer.Exit(0)
 
-    table = Table(title=f"Inventaire Cryptographique & Risques Quantiques ({len(all_findings)} alertes)")
-    table.add_column("Fichier / Endpoint", style="cyan")
+    table = Table(title=tr_cli(
+        f"Inventaire Cryptographique & Risques Quantiques ({len(all_findings)} alertes)",
+        f"Cryptographic Inventory & Quantum Risks ({len(all_findings)} findings)"
+    ))
+    table.add_column(tr_cli("Fichier / Endpoint", "File / Endpoint"), style="cyan")
     table.add_column("Source", style="magenta")
-    table.add_column("Actif / Algorithme détecté", style="white")
-    table.add_column("Risque PQC", style="bold")
-    table.add_column("Plan de remédiation (Auto-PR disponible en SaaS)", style="green")
+    table.add_column(tr_cli("Actif / Algorithme détecté", "Detected Crypto Asset"), style="white")
+    table.add_column(tr_cli("Risque PQC", "PQC Risk"), style="bold")
+    table.add_column(tr_cli("Plan de remédiation (Auto-PR disponible en SaaS)", "Remediation Plan (SaaS Auto-PR Ready)"), style="green")
 
     critical_count = 0
     for f in all_findings:
-        risk_color = "red" if f["risk"] == "CRITIQUE" else "yellow"
         if f["risk"] == "CRITIQUE":
             critical_count += 1
+        df = translate_finding_to_en(f)
+        risk_color = "red" if f["risk"] == "CRITIQUE" else "yellow"
         table.add_row(
-            f"{f['file']}:{f['line']}",
-            f["type"],
-            f["algo"],
-            f"[{risk_color}]{f['risk']}[/{risk_color}]",
-            f["remediation"]
+            f"{df['file']}:{df['line']}",
+            df["type"],
+            df["algo"],
+            f"[{risk_color}]{df['risk']}[/{risk_color}]",
+            df["remediation"]
         )
 
     console.print(table)
 
     # 6. Export du CBOM CycloneDX 1.6 et du rapport SARIF 2.1.0
     generate_cyclonedx_cbom(all_findings, cbom_out)
-    console.print(f"\n📄 [bold]CBOM CycloneDX 1.6 généré avec succès :[/bold] [underline]{cbom_out}[/underline]")
+    console.print(tr_cli(f"\n📄 [bold]CBOM CycloneDX 1.6 généré avec succès :[/bold] [underline]{cbom_out}[/underline]", f"\n📄 [bold]CycloneDX 1.6 CBOM successfully generated:[/bold] [underline]{cbom_out}[/underline]"))
 
     if sarif_out:
         generate_sarif_report(all_findings, sarif_out)
-        console.print(f"🛡️  [bold]Rapport OASIS SARIF 2.1.0 généré (GitHub Code Scanning) :[/bold] [underline]{sarif_out}[/underline]")
+        console.print(tr_cli(f"🛡️  [bold]Rapport OASIS SARIF 2.1.0 généré (GitHub Code Scanning) :[/bold] [underline]{sarif_out}[/underline]", f"🛡️  [bold]OASIS SARIF 2.1.0 report generated (GitHub Code Scanning):[/bold] [underline]{sarif_out}[/underline]"))
 
     # 6a. Vérification de la clé SaaS (--api-key) si fournie ou si --auto-pr est demandé
     if auto_pr and not api_key:
         console.print(
             "\n[bold red]🔒 L'option --auto-pr est une fonctionnalité Shorless SaaS.[/bold red]\n"
-            "[yellow]👉 Obtenez une clé d'essai gratuite (14j) sur https://shorless.io puis ajoutez :[/yellow] "
+            "[yellow]👉 Obtenez une clé d'essai (500 crédits offerts) sur https://shorless.io puis ajoutez :[/yellow] "
             "[bold white]--api-key shorless_trial_...[/bold white]"
         )
         raise typer.Exit(code=1)
@@ -2192,7 +2233,7 @@ def scan(
 
     # 8. Mode bloqueur CI/CD (GitHub Actions / GitLab CI)
     if fail_on_critical and critical_count > 0:
-        console.print(f"\n[bold red]❌ Pipeline CI bloquée : {critical_count} vulnérabilité(s) critique(s) face au risque quantique.[/bold red]")
+        console.print(tr_cli(f"\n[bold red]❌ Pipeline CI bloquée : {critical_count} vulnérabilité(s) critique(s) face au risque quantique.[/bold red]", f"\n[bold red]❌ CI Pipeline blocked: {critical_count} critical quantum vulnerability(ies) found.[/bold red]"))
         raise typer.Exit(code=1)
 
 

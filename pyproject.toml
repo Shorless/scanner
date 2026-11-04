@@ -1,26 +1,36 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "shorless"
-version = "1.0.0"
-description = "Scanner DevSecOps Post-Quantique (PQC) & Générateur CBOM CycloneDX 1.6"
+version = "1.0.1"
+description = "Post-Quantum Cryptography (PQC) DevSecOps Scanner, SCA, SARIF & CycloneDX 1.6 CBOM Generator (FR/EN)"
 readme = "README.md"
-requires-python = ">=3.8"
 license = { text = "Apache-2.0" }
 authors = [
-    { name = "Shorless Security", email = "contact@shorless.io" }
+    { name = "Shorless Security (ALLBYWEB SARL)", email = "contact@shorless.io" }
 ]
-keywords = ["pqc", "post-quantum", "cbom", "cyclonedx", "devsecops", "cryptography", "ml-kem"]
+requires-python = ">=3.8"
 dependencies = [
     "typer>=0.9.0",
     "rich>=13.0.0"
+]
+keywords = ["post-quantum", "pqc", "cbom", "cyclonedx", "devsecops", "ml-kem", "ml-dsa", "anssi", "nist", "sarif"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Topic :: Security",
+    "Topic :: Security :: Cryptography",
+    "Programming Language :: Python :: 3"
 ]
 
 [project.urls]
 Homepage = "https://shorless.io"
 Documentation = "https://shorless.io/scanner-documentation.html"
+Dashboard = "https://shorless.io/dashboard.html"
 Repository = "https://github.com/Shorless/scanner"
 
 [project.scripts]
