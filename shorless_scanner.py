@@ -38,7 +38,7 @@ from rich.panel import Panel
 app = typer.Typer(help="Scanner DevSecOps de préparation Post-Quantique (PQC), SCA, SARIF & Générateur CBOM CycloneDX 1.6")
 console = Console()
 
-SCANNER_VERSION = "1.0.1"
+SCANNER_VERSION = "1.0.2"
 
 # Base de connaissances PQC (Règles NIST FIPS 203/204 & ANSSI)
 PQC_RULES = {
@@ -1334,7 +1334,7 @@ def generate_sarif_report(findings: list, output_path: str):
 
     sarif_doc = {
         "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-        "version": "1.0.1",
+        "version": "1.0.2",
         "runs": [{
             "tool": {
                 "driver": {

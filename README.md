@@ -1,8 +1,8 @@
 # ⚡ Shorless — Post-Quantum (PQC) DevSecOps Scanner, Auto-PR & CycloneDX 1.6 CBOM Generator
 
-[![PyPI version](https://img.shields.io/badge/pypi-v1.0.1-10B981.svg)](https://pypi.org/project/shorless/)
+[![PyPI version](https://img.shields.io/badge/pypi-v1.0.2-10B981.svg)](https://pypi.org/project/shorless/)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Shorless%20PQC%20Action-2088FF.svg?logo=github-actions&logoColor=white)](https://github.com/marketplace/actions/shorless-pqc-cyclonedx-1-6-cbom-scanner)
-[![GitHub Release](https://img.shields.io/badge/release-v1.0.1-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v1.0.1)
+[![GitHub Release](https://img.shields.io/badge/release-v1.0.2-06B6D4.svg)](https://github.com/Shorless/scanner/releases/tag/v1.0.2)
 [![License](https://img.shields.io/badge/license-Apache%202.0-3B82F6.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CycloneDX 1.6](https://img.shields.io/badge/CBOM-CycloneDX%201.6-A855F7.svg)](https://cyclonedx.org/capabilities/cbom/)
 [![PQC Score](https://shorless.io/api_badge.php?project=Shorless/scanner)](https://shorless.io/dashboard.html)
@@ -15,12 +15,12 @@
 
 ---
 
-## 🆕 Nouveautés de la version v1.0.1 (Support Bilingue FR/EN (--lang), Barème de Crédits Unifié (500 Crédits Offerts), Conformité CGV/CGU & Suppression RGPD)
+## 🆕 Nouveautés de la version v1.0.2 (Formulaire Contact (contact@shorless.io), Tchat Bot IA Gemini Flash 3.8 & Décrochage Conseiller Humain)
 
-- Ajout de l'option CLI --lang (-l fr|en) et de la variable d'environnement SHORLESS_LANG=en pour exécuter le scanner, les tableaux Rich et la télémétrie SaaS en Français ou en Anglais.
-- Ajout de l'input lang ('fr' ou 'en') dans la GitHub Action officielle (action.yml) et support bilingue complet dans la Console SaaS (dashboard.html) et la documentation.
-- Alignement sur le modèle par crédits (500 crédits offerts à l'essai, 5 crédits/scan CI/CD, 15 crédits avec --auto-pr, 1 crédit/sonde TLS) détaillé dans les CGV.
-- Ajout du workflow RGPD de suppression définitive de compte et des données associées avec double confirmation (case d'impact + lien sécurisé par email).
+- Ajout du formulaire de contact commercial et support technique (api_contact.php) envoyant directement les demandes à contact@shorless.io avec accusé de réception client et journalisation Zero-PII.
+- Intégration du Tchat Bot IA propulsé par Gemini Flash 3.8 (api_chatbot.php + shorless-assistant-widget.js) entraîné sur l'ensemble des fonctionnalités Shorless.
+- Ajout du mode décrochage en 1 clic vers un conseiller humain dans le tchat avec transfert instantané de l'historique de conversation à contact@shorless.io.
+- Compatibilité Python 3.14 (installation automatique de setuptools/wheel et gestion tolérante de twine upload --skip-existing).
 
 ---
 
@@ -78,7 +78,7 @@ shorless . --check-tls https://api.entreprise.fr --cbom cbom.json --ci
 
 ---
 
-## 🤖 Intégration GitHub Action Officielle (`Shorless/scanner@v0` / `@v1.0.1`)
+## 🤖 Intégration GitHub Action Officielle (`Shorless/scanner@v0` / `@v1.0.2`)
 
 Disponible sur le **[GitHub Marketplace](https://github.com/marketplace/actions/shorless-pqc-cyclonedx-1-6-cbom-scanner)**. Ajoutez ce workflow dans `.github/workflows/shorless-pqc.yml` :
 

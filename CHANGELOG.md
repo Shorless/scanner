@@ -1,5 +1,11 @@
 # Changelog — Shorless PQC & CBOM Scanner
 
+## [v1.0.2] — 2026-11-04 : Formulaire Contact (contact@shorless.io), Tchat Bot IA Gemini Flash 3.8 & Décrochage Conseiller Humain
+- Ajout du formulaire de contact commercial et support technique (api_contact.php) envoyant directement les demandes à contact@shorless.io avec accusé de réception client et journalisation Zero-PII.
+- Intégration du Tchat Bot IA propulsé par Gemini Flash 3.8 (api_chatbot.php + shorless-assistant-widget.js) entraîné sur l'ensemble des fonctionnalités Shorless.
+- Ajout du mode décrochage en 1 clic vers un conseiller humain dans le tchat avec transfert instantané de l'historique de conversation à contact@shorless.io.
+- Compatibilité Python 3.14 (installation automatique de setuptools/wheel et gestion tolérante de twine upload --skip-existing).
+
 ## [v1.0.1] — 2026-11-04 : Support Bilingue FR/EN (--lang), Barème de Crédits Unifié (500 Crédits Offerts), Conformité CGV/CGU & Suppression RGPD
 - Ajout de l'option CLI --lang (-l fr|en) et de la variable d'environnement SHORLESS_LANG=en pour exécuter le scanner, les tableaux Rich et la télémétrie SaaS en Français ou en Anglais.
 - Ajout de l'input lang ('fr' ou 'en') dans la GitHub Action officielle (action.yml) et support bilingue complet dans la Console SaaS (dashboard.html) et la documentation.
