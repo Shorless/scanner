@@ -9,7 +9,7 @@ description = "Post-Quantum Cryptography (PQC) DevSecOps Scanner, SCA, SARIF & C
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [
-    { name = "Shorless Security (ALLBYWEB SARL)", email = "contact@shorless.io" }
+    { name = "Shorless Security", email = "contact@shorless.io" }
 ]
 requires-python = ">=3.8"
 dependencies = [

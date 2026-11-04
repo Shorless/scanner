@@ -1,10 +1,10 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:6c6016ae-bb58-4af5-ad06-241f5f45b0f6",
+  "serialNumber": "urn:uuid:de22e9f9-5ae8-4c0f-86c5-c612e68fdcbd",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-11-04T11:33:44.789713+00:00",
+    "timestamp": "2026-11-04T12:45:00.319411+00:00",
     "tools": [
       {
         "vendor": "Shorless",
